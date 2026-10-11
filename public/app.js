@@ -197,7 +197,12 @@ function dateInput(id, val) {
   i.onchange = async () => { try { await api('/api/users/' + encodeURIComponent(id), 'PUT', { expira: i.value }); toast('Expiração atualizada'); mark(); } catch (e) { toast(e.message); } };
   return i;
 }
-function btn(t, fn, c = '') { const b = el('button', 'btn ' + c, t); b.onclick = fn; return b; }
+function btn(t, fn, c = '', title) {
+  const b = el('button', 'btn ' + c, t);
+  b.onclick = fn;
+  if (title) b.title = title;
+  return b;
+}
 
 function openDialog(title, fields, save) {
   $('#dlgTitle').textContent = title; $('#formErr').textContent = '';
@@ -335,8 +340,19 @@ async function loadUsers() {
     const meta = el('span', 'user-meta', (r.limite || 1) + ' conexão' + ((r.limite || 1) === 1 ? '' : 'ões') + (admin && r.revenda ? ' · ' + r.revenda : ''));
     details.append(name, exp, meta); info.append(avatar, details);
     const actions = el('div', 'user-actions');
-    actions.append(btn('✎', () => editUser(r), 'icon-btn'), btn('×', () => delUser(r), 'icon-btn delete'));
-    card.append(info, el('span', 'pill ' + s.c, s.t), actions);
+    if (r.blocked) {
+      actions.append(btn('▶', () => unblockUser(r), 'icon-btn ok', 'Desbloquear'));
+    } else {
+      actions.append(btn('⏸', () => blockUser(r), 'icon-btn warn', 'Bloquear'));
+    }
+    actions.append(btn('↓', () => throttleUser(r), 'icon-btn', r.mbps ? ('Limite: ' + r.mbps + ' Mbps') : 'Limitar tráfego'));
+    if (r.mbps) actions.append(btn('∞', () => unthrottleUser(r), 'icon-btn', 'Remover limite'));
+    actions.append(btn('↺', () => resetTraffic(r), 'icon-btn', 'Zerar tráfego'));
+    actions.append(btn('✎', () => editUser(r), 'icon-btn', 'Editar'), btn('×', () => delUser(r), 'icon-btn delete', 'Excluir'));
+    const pills = el('div', 'user-pills');
+    pills.append(el('span', 'pill ' + (r.blocked ? 'bad' : s.c), r.blocked ? 'Bloqueado' : s.t));
+    if (r.mbps && !r.blocked) pills.append(el('span', 'pill warn', r.mbps + ' Mbps'));
+    card.append(info, pills, actions);
     return card;
   }));
   // mantém a tabela antiga preenchida para compatibilidade com instalações que a exibam via CSS.
@@ -346,7 +362,7 @@ async function loadUsers() {
     const s = sts[i], tr = el('tr', 's-' + s.c), td = el('td'), nm = el('td', 'nm'), stc = el('td');
     td.append(dateInput(r.usuario, r.expira));
     nm.append(makeAvatar(r.usuario, 'av'), el('span', '', r.usuario));
-    stc.append(el('span', 'pill ' + s.c, s.t));
+    stc.append(el('span', 'pill ' + (r.blocked ? 'bad' : s.c), r.blocked ? 'Bloqueado' : s.t));
     tr.append(nm, stc, td, el('td', '', r.limite));
     if (admin) tr.append(el('td', '', r.revenda || '—'));
     [['Usuário', nm], ['Status', stc], ['Expira em', td]].forEach(([l, c]) => c.dataset.l = l);
@@ -367,6 +383,51 @@ function editUser(r) {
 async function delUser(r) {
   if (!confirm('Excluir ' + r.usuario + '? A conta do Linux será apagada e as conexões derrubadas.')) return;
   try { await api('/api/users/' + encodeURIComponent(r.usuario), 'DELETE'); toast('Usuário excluído'); refresh(); } catch (e) { toast(e.message); }
+}
+async function blockUser(r) {
+  if (!confirm('Bloquear ' + r.usuario + '? As conexões serão derrubadas (usuarios.db + DragonCore se existir).')) return;
+  try {
+    const d = await api('/api/users/' + encodeURIComponent(r.usuario) + '/block', 'POST', {});
+    toast(d.warning || (r.usuario + ' bloqueado'));
+    refresh();
+  } catch (e) { toast(e.message); }
+}
+async function unblockUser(r) {
+  try {
+    const d = await api('/api/users/' + encodeURIComponent(r.usuario) + '/unblock', 'POST', {});
+    toast(d.warning || (r.usuario + ' desbloqueado'));
+    refresh();
+  } catch (e) { toast(e.message); }
+}
+async function throttleUser(r) {
+  const v = prompt('Limite de tráfego em Mbps (ex: 1, 5, 10). 0 = sem limite especial.', String(r.mbps || 1));
+  if (v == null) return;
+  const mbps = parseInt(v, 10);
+  if (!(mbps >= 0)) { toast('Valor inválido'); return; }
+  try {
+    if (mbps === 0) {
+      await api('/api/users/' + encodeURIComponent(r.usuario) + '/unthrottle', 'POST', {});
+      toast('Limite removido');
+    } else {
+      await api('/api/users/' + encodeURIComponent(r.usuario) + '/throttle', 'POST', { mbps });
+      toast('Tráfego limitado a ' + mbps + ' Mbps');
+    }
+    refresh();
+  } catch (e) { toast(e.message); }
+}
+async function unthrottleUser(r) {
+  try {
+    await api('/api/users/' + encodeURIComponent(r.usuario) + '/unthrottle', 'POST', {});
+    toast('Limite de tráfego removido');
+    refresh();
+  } catch (e) { toast(e.message); }
+}
+async function resetTraffic(r) {
+  if (!confirm('Zerar contadores de tráfego de ' + r.usuario + ' no DragonCore?')) return;
+  try {
+    await api('/api/users/' + encodeURIComponent(r.usuario) + '/reset-traffic', 'POST', {});
+    toast('Tráfego zerado');
+  } catch (e) { toast(e.message); }
 }
 
 async function loadOnline() {

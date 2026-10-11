@@ -855,10 +855,16 @@ body {
 .user-details p, .user-meta { display:block; margin:0; color:var(--mut); font-size:.67rem; }
 .user-meta { color:#64748b; margin-top:3px; }
 .user-card > .pill { flex:0 0 auto; margin-left:0; align-self:center; font-size:.6rem; }
-.user-actions { display:flex; align-items:center; gap:6px; margin-left:0; }
+.user-pills { display:flex; flex-direction:column; gap:4px; align-items:flex-end; flex:0 0 auto; }
+.user-pills .pill { font-size:.6rem; }
+.user-actions { display:flex; align-items:center; gap:6px; margin-left:0; flex-wrap:wrap; justify-content:flex-end; }
 .icon-btn { width:32px; height:32px; padding:0; display:grid; place-items:center; color:var(--mut); background:rgba(255,255,255,.05); border:1px solid var(--line); font-size:1rem; }
 .icon-btn:hover { color:var(--ink); background:rgba(255,255,255,.15); }
 .icon-btn.delete:hover { color:var(--bad); background:rgba(239,68,68,.2); border-color:rgba(239,68,68,.4); }
+.icon-btn.warn { color:var(--warn); border-color:rgba(251,191,36,.35); }
+.icon-btn.warn:hover { background:rgba(251,191,36,.15); color:var(--warn); }
+.icon-btn.ok { color:var(--ok); border-color:rgba(52,211,153,.35); }
+.icon-btn.ok:hover { background:rgba(52,211,153,.15); color:var(--ok); }
 .legacy-panel { width:100%; }
 .online-view { display:flex; flex-direction:column; gap:16px; }
 .online-hero { display:flex; align-items:center; justify-content:space-between; min-height:126px; position:relative; overflow:hidden; }
