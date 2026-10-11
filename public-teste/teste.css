@@ -1,0 +1,40 @@
+:root{--bg:#f3f0fa;--card:#fff;--ink:#1d1833;--mut:#6b6585;--line:#e2dcf0;--ac:#6d28d9;--acd:#5b21b6;--bad:#c92a2a;--ok:#178a45;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#130f1f;--card:#1c1630;--ink:#ece8f8;--mut:#9a90b8;--line:#2e2550;--ac:#7c3aed;--acd:#8b5cf6;--bad:#ff7b7b;--ok:#4ade80;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.card{width:100%;max-width:430px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:30px;box-shadow:0 10px 30px -18px rgba(20,30,60,.35)}
+h1{margin:0 0 6px;font-size:26px;letter-spacing:-.01em}
+.muted{color:var(--mut);margin:0 0 18px}.err{color:var(--bad);min-height:1.4em;margin:8px 0}.ok{color:var(--ok);font-weight:600}
+.btn{display:block;width:100%;text-align:center;text-decoration:none;border:0;border-radius:10px;padding:13px 16px;font:inherit;font-weight:700;cursor:pointer;margin-top:10px}
+.btn.primary{background:var(--ac);color:#fff}.btn.primary:hover{background:var(--acd)}
+.btn.primary:disabled{opacity:.6;cursor:wait}
+.btn.wa{background:var(--ok);color:#fff}
+@media(prefers-color-scheme:dark){.btn.wa{color:#08210f}}
+.btn:focus-visible,a:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+dl{margin:14px 0;display:grid;gap:8px}
+.row{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.row dt{color:var(--mut);font-size:13px;width:70px}
+.row dd{margin:0;flex:1;font-weight:600;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace}
+.row button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer}
+.foot{text-align:center;margin:20px 0 0;font-size:14px}.foot a{color:var(--mut)}
+[hidden]{display:none!important}
+
+/* botões do WhatsApp */
+.btn.wa{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--ok);color:#fff;box-shadow:0 8px 20px -10px var(--ok);transition:transform .15s,box-shadow .15s,filter .15s}
+@media(prefers-color-scheme:dark){.btn.wa{color:#08210f}}
+.btn.wa:hover{transform:translateY(-1px);filter:brightness(1.06);box-shadow:0 12px 24px -10px var(--ok)}
+.btn.wa svg{width:22px;height:22px;flex:none;fill:currentColor}
+.btn.wa.soft{margin-top:14px;background:color-mix(in srgb,var(--ok) 13%,transparent);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 40%,transparent);box-shadow:none}
+.btn.wa.soft:hover{background:color-mix(in srgb,var(--ok) 20%,transparent);box-shadow:none;filter:none}
+@media(prefers-reduced-motion:reduce){.btn.wa{transition:none}.btn.wa:hover{transform:none}}
+
+/* botão de download do app */
+.btn.download{display:flex;align-items:center;justify-content:center;gap:8px;background:#2563eb;color:#fff;box-shadow:0 8px 20px -10px #2563eb;transition:transform .15s,box-shadow .15s,filter .15s}
+.btn.download:hover{transform:translateY(-1px);filter:brightness(1.06);box-shadow:0 12px 24px -10px #2563eb}
+.btn.download.soft{margin-top:14px;background:color-mix(in srgb,#2563eb 13%,transparent);color:#2563eb;border:1px solid color-mix(in srgb,#2563eb 40%,transparent);box-shadow:none}
+.btn.download.soft:hover{background:color-mix(in srgb,#2563eb 20%,transparent);box-shadow:none;filter:none}
+@media(prefers-color-scheme:dark){
+  .btn.download{background:#3b82f6}
+  .btn.download.soft{color:#93c5fd;border-color:color-mix(in srgb,#3b82f6 45%,transparent)}
+}
+@media(prefers-reduced-motion:reduce){.btn.download{transition:none}.btn.download:hover{transform:none}}

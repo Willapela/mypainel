@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Painel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css?v=avatar-v1">
+</head>
+<body>
+<main id="login" class="login" hidden>
+  <div class="login-glow" aria-hidden="true"></div>
+  <form id="loginForm" class="card login-card">
+    <div class="login-head">
+      <div class="logo" aria-hidden="true">P</div>
+      <div><h1>Painel</h1><p class="muted">Gestão de usuários e revendas</p></div>
+    </div>
+    <label>Usuário<input name="user" autocomplete="username" required placeholder="admin"></label>
+    <label>Senha<input name="pass" type="password" autocomplete="current-password" required placeholder="••••••••"></label>
+    <p id="loginErr" class="err" role="alert"></p>
+    <button class="btn primary" type="submit">Entrar</button>
+  </form>
+</main>
+
+<div id="app" hidden>
+  <div class="dashboard-container">
+    <header class="top-navbar">
+      <div class="brand"><div class="logo sm" aria-hidden="true">P</div><div><h1>Painel <span id="who" class="pill" hidden></span></h1><span class="brand-subtitle">Central de gerenciamento</span></div></div>
+      <nav class="tabs" aria-label="Navegação principal">
+        <button class="tab on" data-v="users" type="button">Usuários</button>
+        <button class="tab" data-v="online" type="button">Online <span id="onCount" class="pill badge-online">0</span></button>
+        <button class="tab" data-v="rev" id="tabRev" type="button">Revendas</button>
+      </nav>
+      <div class="bar-actions">
+        <label class="search-wrap"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Buscar usuário…" aria-label="Buscar usuário"></label>
+        <button id="testBtn" class="btn test" type="button" title="Cria um usuário de teste rápido">Criar teste</button>
+        <button id="newBtn" class="btn primary" type="button"><span class="plus" aria-hidden="true">+</span> Novo usuário</button>
+        <button id="logoutBtn" class="btn logout-top" type="button" title="Sair do sistema" aria-label="Sair do sistema">↪</button>
+      </div>
+    </header>
+
+    <section id="stats" class="stats metrics-grid" hidden>
+      <div class="stat metric-card"><span class="metric-icon purple">◈</span><div><span class="stat-l">Usuários Totais</span><span class="stat-n" id="stTotal">0</span></div><span class="metric-trend">Ativos no painel</span></div>
+      <div class="stat warn metric-card"><span class="metric-icon amber">◷</span><div><span class="stat-l">Vencem em 7 dias</span><span class="stat-n" id="stSoon">0</span></div><span class="metric-trend">Acompanhe os prazos</span></div>
+      <div class="stat bad metric-card"><span class="metric-icon red">!</span><div><span class="stat-l">Expirados</span><span class="stat-n" id="stExp">0</span></div><span class="metric-trend">Precisam de atenção</span></div>
+    </section>
+
+    <main id="v-users" class="main-content-grid view-panel">
+      <section class="glass-panel traffic-panel">
+        <div class="panel-header"><div><p class="eyebrow">MONITORAMENTO REAL</p><h2 class="panel-title">Consumo da VPS em Tempo Real</h2></div><span class="live-label"><i></i> Atualizado a cada 5s</span></div>
+        <div class="chart-card" aria-label="Gráfico visual de conexões recentes">
+          <div class="chart-y"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div>
+          <div class="chart-area"><div class="chart-grid"></div><svg class="line-chart" viewBox="0 0 700 260" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="areaFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#a855f7" stop-opacity=".35"/><stop offset="1" stop-color="#a855f7" stop-opacity="0"/></linearGradient><linearGradient id="lineStroke"><stop stop-color="#ec4899"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs><path class="chart-area-fill" d="M0,214 C55,190 82,206 125,164 S190,174 230,137 S292,161 334,118 S395,143 440,96 S505,120 540,75 S620,103 700,42 L700,260 L0,260 Z"/><path class="chart-line" d="M0,214 C55,190 82,206 125,164 S190,174 230,137 S292,161 334,118 S395,143 440,96 S505,120 540,75 S620,103 700,42"/></svg><div class="chart-x"><span>10:00</span><span>10:15</span><span>10:30</span><span>10:45</span><span>11:00</span><span>Agora</span></div></div>
+        </div>
+        <div class="chart-footer"><span><i class="dot purple-dot"></i> Conexões simultâneas</span><strong id="chartOnline">0 online agora</strong><span class="metric-live"><i class="dot cpu-dot"></i> CPU <b id="metricCpu">—</b></span><span class="metric-live"><i class="dot ram-dot"></i> RAM <b id="metricRam">—</b></span><span class="metric-live"><i class="dot net-dot"></i> Rede <b id="metricNet">—</b></span><span class="chart-status"><i></i> Sistema estável</span></div>
+
+        <div class="nettools">
+          <div class="nettool-card">
+            <div class="nettool-head">
+              <span class="metric-icon cyan">⏱</span>
+              <div>
+                <strong>Ping da VPS</strong>
+                <span class="muted">Atualiza automático · 1.1.1.1</span>
+              </div>
+            </div>
+            <div class="nettool-stats">
+              <div><small>Média</small><b id="pingAvg">—</b></div>
+              <div><small>Mín</small><b id="pingMin">—</b></div>
+              <div><small>Máx</small><b id="pingMax">—</b></div>
+              <div><small>Perda</small><b id="pingLoss">—</b></div>
+            </div>
+          </div>
+          <div class="nettool-card wide">
+            <div class="nettool-head">
+              <span class="metric-icon green">⚡</span>
+              <div>
+                <strong>Speedtest (Ookla)</strong>
+                <span class="muted" id="speedMeta">Atualiza a cada 5 min · automático</span>
+              </div>
+              <button type="button" class="btn nettool-btn" id="btnSpeed" title="Forçar novo teste agora">Rodar agora</button>
+            </div>
+            <div class="nettool-stats speed-stats">
+              <div><small>Download</small><b id="speedDown">—</b></div>
+              <div><small>Upload</small><b id="speedUp">—</b></div>
+              <div><small>Latência</small><b id="speedLat">—</b></div>
+              <div><small>Jitter</small><b id="speedJit">—</b></div>
+              <div><small>Perda</small><b id="speedLoss">—</b></div>
+            </div>
+            <div class="nettool-foot muted" id="speedServer">Aguardando primeiro teste…</div>
+          </div>
+        </div>
+      </section>
+      <section class="glass-panel profiles-panel">
+        <div class="panel-header"><div><p class="eyebrow">CONTAS</p><h2 class="panel-title">Gerenciar Perfis</h2></div><span id="profileCount" class="panel-meta">0 usuários</span></div>
+        <div id="userCards" class="user-cards-list"></div>
+        <p id="empty" class="muted empty-msg" hidden>Nenhum usuário encontrado.<br>Use “Novo usuário” para começar.</p>
+      </section>
+    </main>
+
+    <section id="v-online" class="online-view" hidden>
+      <div class="online-hero glass-panel"><div><p class="eyebrow">STATUS DA SESSÃO</p><h2 class="panel-title">Usuários conectados</h2><p class="online-subtitle">Acompanhe as conexões ativas em tempo real.</p></div><div class="online-total"><i></i><strong id="onlineTotal">0</strong><span>conectados agora</span></div></div>
+      <div id="onlineCards" class="online-grid"></div>
+      <p id="emptyOn" class="muted empty-msg online-empty" hidden><span class="empty-orb">◌</span><strong>Ninguém conectado agora</strong><span>A lista atualiza automaticamente.</span></p>
+      <div class="online-compat" aria-hidden="true"><table><tbody id="bOn"></tbody></table></div>
+    </section>
+    <section id="v-rev" class="panel legacy-panel" hidden><div class="table-scroll"><table><thead><tr><th>Revenda</th><th>Usuários</th><th>Status</th><th></th></tr></thead><tbody id="bRev"></tbody></table></div><p id="emptyRev" class="muted empty-msg" hidden>Nenhuma revenda ainda. Use “Nova revenda” para criar a primeira.</p></section>
+  </div>
+</div>
+
+<dialog id="dlg"><form id="form" method="dialog" class="card dlg-card"><h2 id="dlgTitle"></h2><div id="fields"></div><p id="formErr" class="err" role="alert"></p><div class="row"><button type="button" class="btn" id="cancel">Cancelar</button><button class="btn primary" type="submit">Salvar</button></div></form></dialog>
+<dialog id="testDlg"><div class="card dlg-card"><h2>Usuário de teste criado</h2><p class="muted">Guarde esses dados — a senha não será mostrada de novo.</p><div class="cred-box"><div><span class="muted">Usuário</span><code id="testUser"></code></div><div><span class="muted">Senha</span><code id="testPass"></code></div><div><span class="muted">Expira</span><code id="testExp"></code></div></div><label class="copy-label">Texto completo<textarea id="testCopyArea" readonly rows="6"></textarea></label><div class="row"><button type="button" class="btn" id="testCopy">Copiar tudo</button><button type="button" class="btn primary" id="testOk">Ok</button></div></div></dialog>
+<div id="toast" role="status"></div>
+<script src="/app.js?v=avatar-v2"></script>
+</body>
+</html>
