@@ -77,22 +77,30 @@ function dcExpiresAt(isoDate) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate + 'T23:59:59Z';
   return isoDate;
 }
-async function dcUpsertUser({ usuario, senha, limite, expira }) {
-  if (!DC.on) return;
-  if (!(await dcLogin())) return;
+async function dcUpsertUser(opts) {
+  if (!DC.on) return { ok: false, error: 'DragonCore desativado' };
+  if (!(await dcLogin())) return { ok: false, error: 'Falha no login DragonCore' };
   const body = {
-    username: usuario,
-    max_connections: Math.max(0, parseInt(limite, 10) || 1),
-    expires_at: dcExpiresAt(expira || '')
+    username: opts.usuario,
+    max_connections: Math.max(0, parseInt(opts.limite, 10) || 0),
+    expires_at: dcExpiresAt(opts.expira || '')
   };
-  if (senha) body.password = senha;
+  if (opts.senha) body.password = opts.senha;
+  if (opts.limit_mbps_up != null) body.limit_mbps_up = Math.max(0, +opts.limit_mbps_up || 0);
+  if (opts.limit_mbps_down != null) body.limit_mbps_down = Math.max(0, +opts.limit_mbps_down || 0);
+  if (opts.data_quota_bytes != null) body.data_quota_bytes = Math.max(0, +opts.data_quota_bytes || 0);
+  if (opts.quota_action) body.quota_action = opts.quota_action;
+  if (opts.quota_throttle_mbps != null) body.quota_throttle_mbps = Math.max(0, +opts.quota_throttle_mbps || 0);
+  if (opts.reset_usage) body.reset_usage = true;
   let r = await dcFetch('/api/users/create', { method: 'POST', body });
   if (r.status === 401) {
     if (await dcLogin(true)) r = await dcFetch('/api/users/create', { method: 'POST', body });
   }
   if (!r.ok && r.status !== 201) {
-    console.warn('[DragonCore] upsert', usuario, r.status, (r.text || '').slice(0, 200));
+    console.warn('[DragonCore] upsert', opts.usuario, r.status, (r.text || '').slice(0, 200));
+    return { ok: false, error: r.text || ('HTTP ' + r.status) };
   }
+  return { ok: true };
 }
 async function dcDeleteUser(usuario) {
   if (!DC.on) return;
@@ -104,6 +112,22 @@ async function dcDeleteUser(usuario) {
   if (!r.ok && r.status !== 204) {
     console.warn('[DragonCore] delete', usuario, r.status, (r.text || '').slice(0, 200));
   }
+}
+async function dcResetTraffic(usuario) {
+  if (!DC.on) return { ok: false, error: 'DragonCore desativado' };
+  if (!(await dcLogin())) return { ok: false, error: 'Falha no login DragonCore' };
+  let r = await dcFetch('/api/users/reset-traffic', { method: 'POST', body: { username: usuario } });
+  if (r.status === 401) {
+    if (await dcLogin(true)) r = await dcFetch('/api/users/reset-traffic', { method: 'POST', body: { username: usuario } });
+  }
+  if (!r.ok) return { ok: false, error: r.text || ('HTTP ' + r.status) };
+  return { ok: true };
+}
+// metadados de tráfego/bloqueio por usuário (persistido em painel.json)
+S.meta ||= {};
+function userMeta(u) {
+  if (!S.meta[u]) S.meta[u] = { blocked: false, mbps: 0 };
+  return S.meta[u];
 }
 if (DC.on) console.log('[DragonCore] integração ativa →', DC.base);
 
@@ -375,7 +399,17 @@ app.post('/api/login', rateLimit({ windowMs: 15 * 60e3, max: 5, standardHeaders:
 app.post('/api/logout', auth, csrf, (req, res) => req.session.destroy(() => res.json({ ok: true })));
 function visible(req) {
   const lim = readLimits(), own = new Map(Object.entries(S.map).map(([u, id]) => [u, (S.revs.find(r => r.id === id) || {}).nome]));
-  const rows = sysUsers().map(u => ({ ...u, limite: lim.get(u.usuario) ?? 1, revenda: own.get(u.usuario) || (S.tst && S.tst.some(t => t.u === u.usuario) ? 'teste grátis' : null) }));
+  S.meta ||= {};
+  const rows = sysUsers().map(u => {
+    const m = S.meta[u.usuario] || {};
+    return {
+      ...u,
+      limite: lim.get(u.usuario) ?? 1,
+      revenda: own.get(u.usuario) || (S.tst && S.tst.some(t => t.u === u.usuario) ? 'teste grátis' : null),
+      blocked: !!m.blocked,
+      mbps: m.mbps || 0
+    };
+  });
   return req.session.role === 'rev' ? rows.filter(u => u.revenda === req.session.name) : rows;
 }
 const mustOwn = (req, name) => { if (!visible(req).some(u => u.usuario === name)) throw fail('Usuário não encontrado.'); };
@@ -460,10 +494,170 @@ app.delete('/api/users/:name', auth, csrf, run(async req => {
   await sys('pkill', ['-KILL', '-u', u]).catch(() => { });
   await sys('userdel', [u]);
   const m = readLimits(); if (m.delete(u)) writeLimits(m);
-  if (u in S.map) { delete S.map[u]; save(); }
+  if (u in S.map) { delete S.map[u]; }
+  if (S.meta && S.meta[u]) delete S.meta[u];
+  save();
   dcDeleteUser(u).catch(e => console.warn('[DragonCore]', e.message));
   return { ok: true };
 }));
+
+// ===== Bloquear / limitar tráfego (Linux real + usuarios.db + DragonCore) =====
+// usuarios.db sozinho NÃO impede login. Trava de verdade no sistema:
+// passwd -l + usermod -L + shell nologin + chage expirado + pkill
+function readUserShell(u) {
+  try {
+    const line = fs.readFileSync('/etc/passwd', 'utf8').split('\n').find(l => l.startsWith(u + ':'));
+    return line ? (line.split(':')[6] || '/bin/false') : '/bin/false';
+  } catch { return '/bin/false'; }
+}
+function isAccountLocked(u) {
+  try {
+    // passwd -S: "user L ..." = locked, "user P ..." = usable password
+    const out = require('child_process').execFileSync('passwd', ['-S', u], { encoding: 'utf8', timeout: 5000 });
+    return /\sL\s/.test(out) || out.includes(' locked');
+  } catch {
+    try {
+      const line = fs.readFileSync('/etc/shadow', 'utf8').split('\n').find(l => l.startsWith(u + ':'));
+      if (!line) return false;
+      const hash = line.split(':')[1] || '';
+      return hash.startsWith('!') || hash.startsWith('*') || hash === '';
+    } catch { return false; }
+  }
+}
+
+app.post('/api/users/:name/block', auth, csrf, run(async req => {
+  const u = req.params.name; mustOwn(req, u);
+  const lim = readLimits().get(u) || 1;
+  const exp = (sysUsers().find(x => x.usuario === u) || {}).expira || '';
+  const meta = userMeta(u);
+  if (!meta.blocked) {
+    meta.prevLimite = lim > 0 ? lim : (meta.prevLimite || 1);
+    meta.prevExpira = exp || '';
+    meta.prevShell = readUserShell(u);
+  }
+  meta.blocked = true;
+  // 1) usuarios.db → 0
+  const db = readLimits(); db.set(u, 0); writeLimits(db);
+  save();
+  // 2) trava senha (várias formas — uma delas costuma valer em qualquer distro)
+  await sys('passwd', ['-l', u]).catch(e => console.warn('passwd -l:', e.message));
+  await sys('usermod', ['-L', u]).catch(e => console.warn('usermod -L:', e.message));
+  // 3) shell nologin/false (quebra login interativo e alguns proxies)
+  await sys('usermod', ['-s', '/usr/sbin/nologin', u]).catch(() =>
+    sys('usermod', ['-s', '/bin/false', u]).catch(e => console.warn('usermod -s:', e.message))
+  );
+  // 4) expira conta
+  await sys('chage', ['-E', '1970-01-01', u]).catch(() =>
+    sys('chage', ['-E', '0', u]).catch(e => console.warn('chage:', e.message))
+  );
+  // 5) mata sessões
+  await sys('pkill', ['-KILL', '-u', u]).catch(() => { });
+  // 6) confere se realmente travou
+  const locked = isAccountLocked(u);
+  if (!locked) {
+    // último recurso: invalida o hash colocando ! na frente via usermod já tentado
+    throw fail('Não foi possível travar a conta no Linux (passwd/usermod). Rode como root e confira: passwd -S ' + u);
+  }
+  // 7) DragonCore
+  let warning = null;
+  if (DC.on) {
+    const r = await dcUpsertUser({
+      usuario: u, limite: 0, expira: '1970-01-01',
+      limit_mbps_up: 0, limit_mbps_down: 0
+    });
+    if (!r.ok) {
+      const msg = String(r.error || '');
+      if (/password|totp|novo usuário|new user/i.test(msg)) {
+        warning = 'Travado no Linux (login deve falhar). DragonCore: user não existe lá — se o app usa só o Dragon, sincronize o user.';
+      } else {
+        warning = 'Travado no Linux. DragonCore: ' + msg;
+      }
+      console.warn('[DragonCore] block', u, msg);
+    }
+  }
+  return { ok: true, blocked: true, locked: true, warning };
+}));
+
+app.post('/api/users/:name/unblock', auth, csrf, run(async req => {
+  const u = req.params.name; mustOwn(req, u);
+  const meta = userMeta(u);
+  const lim = meta.prevLimite > 0 ? meta.prevLimite : 1;
+  const exp = meta.prevExpira || '';
+  const shell = meta.prevShell || '/bin/false';
+  meta.blocked = false;
+  // 1) usuarios.db
+  const db = readLimits(); db.set(u, lim); writeLimits(db);
+  save();
+  // 2) destrava senha
+  await sys('passwd', ['-u', u]).catch(e => console.warn('passwd -u:', e.message));
+  await sys('usermod', ['-U', u]).catch(e => console.warn('usermod -U:', e.message));
+  // 3) restaura shell
+  await sys('usermod', ['-s', shell, u]).catch(e => console.warn('usermod -s restore:', e.message));
+  // 4) restaura expiração
+  await setExpiry(u, exp || '').catch(e => console.warn('chage restore:', e.message));
+  // 5) DragonCore
+  let warning = null;
+  if (DC.on) {
+    const r = await dcUpsertUser({
+      usuario: u, limite: lim, expira: exp,
+      limit_mbps_up: meta.mbps || 0, limit_mbps_down: meta.mbps || 0
+    });
+    if (!r.ok) {
+      const msg = String(r.error || '');
+      if (/password|totp|novo usuário|new user/i.test(msg)) {
+        warning = 'Liberado no Linux. DragonCore: user não existe lá.';
+      } else {
+        warning = 'Liberado no Linux. DragonCore: ' + msg;
+      }
+      console.warn('[DragonCore] unblock', u, msg);
+    }
+  }
+  return { ok: true, blocked: false, limite: lim, warning };
+}));
+
+app.post('/api/users/:name/throttle', auth, csrf, run(async req => {
+  const u = req.params.name; mustOwn(req, u);
+  if (!DC.on) throw fail('DragonCore não está ativo. Ative no .env (DRAGONCORE_ENABLED=1).');
+  const mbps = Math.max(0, Math.min(1000000, parseInt((req.body || {}).mbps, 10) || 1));
+  const lim = readLimits().get(u) || 1;
+  const exp = (sysUsers().find(x => x.usuario === u) || {}).expira || '';
+  const meta = userMeta(u);
+  meta.mbps = mbps;
+  if (meta.blocked) meta.blocked = false;
+  save();
+  const r = await dcUpsertUser({
+    usuario: u, limite: lim, expira: exp,
+    limit_mbps_up: mbps, limit_mbps_down: mbps,
+    quota_action: 'throttle', quota_throttle_mbps: mbps
+  });
+  if (!r.ok) throw fail('DragonCore: ' + (r.error || 'falha ao limitar tráfego'));
+  return { ok: true, mbps };
+}));
+
+app.post('/api/users/:name/unthrottle', auth, csrf, run(async req => {
+  const u = req.params.name; mustOwn(req, u);
+  if (!DC.on) throw fail('DragonCore não está ativo.');
+  const lim = readLimits().get(u) || 1;
+  const exp = (sysUsers().find(x => x.usuario === u) || {}).expira || '';
+  const meta = userMeta(u);
+  meta.mbps = 0;
+  save();
+  const r = await dcUpsertUser({
+    usuario: u, limite: lim, expira: exp,
+    limit_mbps_up: 0, limit_mbps_down: 0
+  });
+  if (!r.ok) throw fail('DragonCore: ' + (r.error || 'falha ao remover limite'));
+  return { ok: true, mbps: 0 };
+}));
+
+app.post('/api/users/:name/reset-traffic', auth, csrf, run(async req => {
+  const u = req.params.name; mustOwn(req, u);
+  if (!DC.on) throw fail('DragonCore não está ativo.');
+  const r = await dcResetTraffic(u);
+  if (!r.ok) throw fail('DragonCore: ' + (r.error || 'falha ao zerar tráfego'));
+  return { ok: true };
+}));
+
 const revBody = (b, isNew) => {
   const o = {};
   if (isNew) { o.nome = String(b.nome || ''); if (!/^[\w.-]{3,32}$/.test(o.nome)) throw fail('Nome: 3 a 32 caracteres (letras, números, ponto, hífen ou _).'); }
