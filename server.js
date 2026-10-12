@@ -2,6 +2,9 @@ require('dotenv').config();
 const express = require('express'), session = require('express-session'), helmet = require('helmet');
 const rateLimit = require('express-rate-limit'), bcrypt = require('bcryptjs'), crypto = require('crypto');
 const { execFile } = require('child_process'), fs = require('fs'), path = require('path'), os = require('os');
+const { checkStartupLicenseAsync } = require('./license');
+// Licença é validada de forma async antes do app.listen (online ou offline).
+
 const { USERS_FILE = '/root/usuarios.db', PANEL_DB = path.join(__dirname, 'data', 'painel.json'), MIN_UID = '1000', ADMIN_USER, ADMIN_HASH, SESSION_SECRET, PORT = 3100, HOST = '127.0.0.1' } = process.env;
 if (!ADMIN_USER || !ADMIN_HASH || !SESSION_SECRET || SESSION_SECRET.length < 24) { console.error('Configure o .env corretamente (veja .env.example).'); process.exit(1); }
 fs.mkdirSync(path.dirname(PANEL_DB), { recursive: true });
@@ -528,37 +531,41 @@ function isAccountLocked(u) {
 app.post('/api/users/:name/block', auth, csrf, run(async req => {
   const u = req.params.name; mustOwn(req, u);
   const lim = readLimits().get(u) || 1;
-  const exp = (sysUsers().find(x => x.usuario === u) || {}).expira || '';
+  // IMPORTANTE: ler validade ANTES de dar chage -E 1970 (senão perde a data)
+  const expRaw = (sysUsers().find(x => x.usuario === u) || {}).expira;
+  const exp = (expRaw && DATE.test(String(expRaw)) && String(expRaw) !== '1970-01-01')
+    ? String(expRaw)
+    : '';
   const meta = userMeta(u);
   if (!meta.blocked) {
     meta.prevLimite = lim > 0 ? lim : (meta.prevLimite || 1);
-    meta.prevExpira = exp || '';
+    // '' = nunca expirou; 'YYYY-MM-DD' = data original
+    meta.prevExpira = exp;
     meta.prevShell = readUserShell(u);
+  } else if (meta.prevExpira == null || meta.prevExpira === '1970-01-01') {
+    // bloqueio antigo sem data salva — guarda se ainda houver uma data válida
+    if (exp) meta.prevExpira = exp;
   }
   meta.blocked = true;
-  // 1) usuarios.db → 0
+  // persiste meta ANTES das mudanças destrutivas no sistema
   const db = readLimits(); db.set(u, 0); writeLimits(db);
   save();
-  // 2) trava senha (várias formas — uma delas costuma valer em qualquer distro)
+  // trava senha
   await sys('passwd', ['-l', u]).catch(e => console.warn('passwd -l:', e.message));
   await sys('usermod', ['-L', u]).catch(e => console.warn('usermod -L:', e.message));
-  // 3) shell nologin/false (quebra login interativo e alguns proxies)
+  // shell nologin/false
   await sys('usermod', ['-s', '/usr/sbin/nologin', u]).catch(() =>
     sys('usermod', ['-s', '/bin/false', u]).catch(e => console.warn('usermod -s:', e.message))
   );
-  // 4) expira conta
+  // expira conta (só depois de salvar prevExpira)
   await sys('chage', ['-E', '1970-01-01', u]).catch(() =>
     sys('chage', ['-E', '0', u]).catch(e => console.warn('chage:', e.message))
   );
-  // 5) mata sessões
   await sys('pkill', ['-KILL', '-u', u]).catch(() => { });
-  // 6) confere se realmente travou
   const locked = isAccountLocked(u);
   if (!locked) {
-    // último recurso: invalida o hash colocando ! na frente via usermod já tentado
     throw fail('Não foi possível travar a conta no Linux (passwd/usermod). Rode como root e confira: passwd -S ' + u);
   }
-  // 7) DragonCore
   let warning = null;
   if (DC.on) {
     const r = await dcUpsertUser({
@@ -575,27 +582,31 @@ app.post('/api/users/:name/block', auth, csrf, run(async req => {
       console.warn('[DragonCore] block', u, msg);
     }
   }
-  return { ok: true, blocked: true, locked: true, warning };
+  return { ok: true, blocked: true, locked: true, prevExpira: meta.prevExpira || null, warning };
 }));
 
 app.post('/api/users/:name/unblock', auth, csrf, run(async req => {
   const u = req.params.name; mustOwn(req, u);
   const meta = userMeta(u);
   const lim = meta.prevLimite > 0 ? meta.prevLimite : 1;
-  const exp = meta.prevExpira || '';
+  // data salva no bloqueio (não reler do sistema — lá está 1970)
+  let exp = meta.prevExpira || '';
+  if (exp === '1970-01-01') exp = '';
   const shell = meta.prevShell || '/bin/false';
   meta.blocked = false;
-  // 1) usuarios.db
   const db = readLimits(); db.set(u, lim); writeLimits(db);
   save();
-  // 2) destrava senha
+  // destrava senha
   await sys('passwd', ['-u', u]).catch(e => console.warn('passwd -u:', e.message));
   await sys('usermod', ['-U', u]).catch(e => console.warn('usermod -U:', e.message));
-  // 3) restaura shell
+  // restaura shell
   await sys('usermod', ['-s', shell, u]).catch(e => console.warn('usermod -s restore:', e.message));
-  // 4) restaura expiração
-  await setExpiry(u, exp || '').catch(e => console.warn('chage restore:', e.message));
-  // 5) DragonCore
+  // restaura expiração: data original OU -1 (nunca)
+  if (exp && DATE.test(exp)) {
+    await sys('chage', ['-E', exp, u]).catch(e => console.warn('chage restore date:', e.message));
+  } else {
+    await sys('chage', ['-E', '-1', u]).catch(e => console.warn('chage restore never:', e.message));
+  }
   let warning = null;
   if (DC.on) {
     const r = await dcUpsertUser({
@@ -612,7 +623,7 @@ app.post('/api/users/:name/unblock', auth, csrf, run(async req => {
       console.warn('[DragonCore] unblock', u, msg);
     }
   }
-  return { ok: true, blocked: false, limite: lim, warning };
+  return { ok: true, blocked: false, limite: lim, expira: exp || null, warning };
 }));
 
 app.post('/api/users/:name/throttle', auth, csrf, run(async req => {
@@ -759,4 +770,26 @@ if (T.on) {
   console.log('Teste grátis em /teste (mesma porta do painel)');
 }
 
-app.listen(PORT, HOST, () => console.log(`Painel em http://${HOST}:${PORT}`));
+// ===== Bootstrap: valida licença (online/offline) e só então sobe o HTTP =====
+(async () => {
+  try {
+    const licenseCheck = await checkStartupLicenseAsync();
+    if (!licenseCheck.ok) {
+      console.error('[Licença] ' + (licenseCheck.error || 'Key inválida'));
+      console.error('Configure LICENSE_KEY + LICENSE_SERVER_URL no .env, ou LICENSE_REQUIRED=0 para dev.');
+      process.exit(1);
+    }
+    if (licenseCheck.skipped) {
+      console.log('[Licença] verificação desligada (LICENSE_REQUIRED=0)');
+    } else {
+      const exp = licenseCheck.expiresAt ? String(licenseCheck.expiresAt).slice(0, 10) : 'sem prazo';
+      const bindMsg = licenseCheck.bind && licenseCheck.bind.message ? ' | ' + licenseCheck.bind.message : '';
+      const id = licenseCheck.payload && licenseCheck.payload.id;
+      console.log('[Licença] OK — id=' + (id || '?') + ' expira=' + exp + bindMsg);
+    }
+  } catch (e) {
+    console.error('[Licença] erro:', e.message);
+    process.exit(1);
+  }
+  app.listen(PORT, HOST, () => console.log(`Painel em http://${HOST}:${PORT}`));
+})();
