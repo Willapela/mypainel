@@ -255,11 +255,11 @@ function ramUsagePercent() {
   return (total - free) / total * 100;
 }
 
-// ===== Monitoramento contínuo: ping + speedtest (Ookla) =====
+// ===== Monitoramento contínuo: ping + speedtest (speedtest-go) =====
 const netStatus = {
   ping: { avg: null, min: null, max: null, loss: 0, at: 0, error: null },
   speed: { download: null, upload: null, latency: null, jitter: null, packetLoss: null, server: null, isp: null, resultUrl: null, at: 0, running: false, error: null },
-  speedIntervalMs: 5 * 60e3 // speedtest automático a cada 5 min
+  speedIntervalMs: 15 * 60e3 // speedtest automático a cada 15 min (recomendado)
 };
 
 async function doPing() {
@@ -285,33 +285,53 @@ async function doSpeedtest() {
   if (netStatus.speed.running) return;
   netStatus.speed.running = true;
   try {
-    // Preferência: Ookla CLI (speedtest). Aceita licença automaticamente.
-    const out = await sys('speedtest', [
-      '--accept-license', '--accept-gdpr',
-      '--format=json',
-      '--progress=no'
-    ], undefined, 120000);
+    // Preferência: speedtest-go (muito mais estável, sem rate-limit da Ookla)
+    // Tenta no PATH e também em ~/go/bin
+    let out;
+    try {
+      out = await sys('speedtest-go', ['--json'], undefined, 120000);
+    } catch (e1) {
+      out = await sys(process.env.HOME + '/go/bin/speedtest-go', ['--json'], undefined, 120000);
+    }
     const j = JSON.parse(out);
-    const dl = j.download && j.download.bandwidth != null ? (j.download.bandwidth * 8) / 1e6 : null;
-    const ul = j.upload && j.upload.bandwidth != null ? (j.upload.bandwidth * 8) / 1e6 : null;
-    const lat = j.ping && j.ping.latency != null ? j.ping.latency : null;
-    const jit = j.ping && j.ping.jitter != null ? j.ping.jitter : null;
-    const pl = j.packetLoss != null ? j.packetLoss : null;
+    const server = (j.servers && j.servers[0]) || {};
+
+    // speedtest-go entrega dl_speed / ul_speed em Mbps
+    const dl = server.dl_speed != null ? Math.round(Number(server.dl_speed) * 100) / 100 : null;
+    const ul = server.ul_speed != null ? Math.round(Number(server.ul_speed) * 100) / 100 : null;
+
+    // latency e jitter vêm como duração (ns) → converte para ms
+    const toMs = (v) => {
+      if (v == null) return null;
+      const n = Number(v);
+      // se for muito grande, assume nanosegundos
+      return n > 1e6 ? Math.round((n / 1e6) * 100) / 100 : Math.round(n * 100) / 100;
+    };
+    const lat = toMs(server.latency);
+    const jit = toMs(server.jitter);
+
+    let pl = null;
+    if (server.packet_loss) {
+      const sent = server.packet_loss.sent || server.packet_loss.Sent || 0;
+      const lost = server.packet_loss.lost || server.packet_loss.Lost || 0;
+      if (sent > 0) pl = Math.round((lost / sent) * 10000) / 100;
+    }
+
     netStatus.speed = {
-      download: dl != null ? Math.round(dl * 100) / 100 : null,
-      upload: ul != null ? Math.round(ul * 100) / 100 : null,
-      latency: lat != null ? Math.round(lat * 100) / 100 : null,
-      jitter: jit != null ? Math.round(jit * 100) / 100 : null,
+      download: dl,
+      upload: ul,
+      latency: lat,
+      jitter: jit,
       packetLoss: pl,
-      server: j.server ? (j.server.name + (j.server.location ? ' - ' + j.server.location : '')) : null,
-      isp: j.isp || null,
-      resultUrl: j.result && j.result.url ? j.result.url : null,
+      server: server.name ? (server.name + (server.sponsor ? ' - ' + server.sponsor : '')) : null,
+      isp: (j.user_info && (j.user_info.isp || j.user_info.Isp)) || null,
+      resultUrl: null,
       at: Date.now(),
       running: false,
       error: null
     };
   } catch (e) {
-    // Fallback: download simples via Cloudflare se Ookla não estiver instalado
+    // Fallback: download simples via Cloudflare
     try {
       const bytes = 15 * 1024 * 1024;
       const url = `https://speed.cloudflare.com/__down?bytes=${bytes}`;
