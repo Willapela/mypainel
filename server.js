@@ -2,8 +2,6 @@ require('dotenv').config();
 const express = require('express'), session = require('express-session'), helmet = require('helmet');
 const rateLimit = require('express-rate-limit'), bcrypt = require('bcryptjs'), crypto = require('crypto');
 const { execFile } = require('child_process'), fs = require('fs'), path = require('path'), os = require('os');
-const { checkStartupLicenseAsync } = require('./license');
-// Licença é validada de forma async antes do app.listen (online ou offline).
 
 const { USERS_FILE = '/root/usuarios.db', PANEL_DB = path.join(__dirname, 'data', 'painel.json'), MIN_UID = '1000', ADMIN_USER, ADMIN_HASH, SESSION_SECRET, PORT = 3100, HOST = '127.0.0.1' } = process.env;
 if (!ADMIN_USER || !ADMIN_HASH || !SESSION_SECRET || SESSION_SECRET.length < 24) { console.error('Configure o .env corretamente (veja .env.example).'); process.exit(1); }
@@ -790,26 +788,4 @@ if (T.on) {
   console.log('Teste grátis em /teste (mesma porta do painel)');
 }
 
-// ===== Bootstrap: valida licença (online/offline) e só então sobe o HTTP =====
-(async () => {
-  try {
-    const licenseCheck = await checkStartupLicenseAsync();
-    if (!licenseCheck.ok) {
-      console.error('[Licença] ' + (licenseCheck.error || 'Key inválida'));
-      console.error('Configure LICENSE_KEY + LICENSE_SERVER_URL no .env, ou LICENSE_REQUIRED=0 para dev.');
-      process.exit(1);
-    }
-    if (licenseCheck.skipped) {
-      console.log('[Licença] verificação desligada (LICENSE_REQUIRED=0)');
-    } else {
-      const exp = licenseCheck.expiresAt ? String(licenseCheck.expiresAt).slice(0, 10) : 'sem prazo';
-      const bindMsg = licenseCheck.bind && licenseCheck.bind.message ? ' | ' + licenseCheck.bind.message : '';
-      const id = licenseCheck.payload && licenseCheck.payload.id;
-      console.log('[Licença] OK — id=' + (id || '?') + ' expira=' + exp + bindMsg);
-    }
-  } catch (e) {
-    console.error('[Licença] erro:', e.message);
-    process.exit(1);
-  }
-  app.listen(PORT, HOST, () => console.log(`Painel em http://${HOST}:${PORT}`));
-})();
+app.listen(PORT, HOST, () => console.log(`Painel em http://${HOST}:${PORT}`));
