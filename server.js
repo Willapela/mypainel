@@ -426,7 +426,7 @@ function visible(req) {
     return {
       ...u,
       limite: lim.get(u.usuario) ?? 1,
-      revenda: own.get(u.usuario) || (S.tst && S.tst.some(t => t.u === u.usuario) ? 'teste grátis' : null),
+      revenda: own.get(u.usuario) || (S.tst && S.tst.some(t => t.u === u.usuario) ? 'teste grátis' : (S.pedidos && S.pedidos.some(p => p.usuario === u.usuario) ? 'compra online' : null)),
       blocked: !!m.blocked,
       mbps: m.mbps || 0
     };
@@ -756,7 +756,8 @@ if (T.on) {
 
   app.get('/api/config', (req, res) => res.json({
     horas: T.horas, whatsapp: T.wa, msg: T.msg, host: T.host, porta: T.sshPort, sitekey: T.tsKey || null,
-    appUrl: T.appUrl || null, appLabel: T.appLabel || 'Baixar aplicativo'
+    appUrl: T.appUrl || null, appLabel: T.appLabel || 'Baixar aplicativo',
+    planos: SALE.on ? SALE.planos.map(({ id, nome, dias, preco, limite, destaque }) => ({ id, nome, dias, preco, limite, destaque })) : []
   }));
   app.post('/api/teste', rateLimit({
     windowMs: 60e3, max: 5, standardHeaders: true, legacyHeaders: false,
@@ -787,5 +788,154 @@ if (T.on) {
   }));
   console.log('Teste grátis em /teste (mesma porta do painel)');
 }
+
+// ===== Vendas online (Mercado Pago · Checkout Pro + webhook) =====
+// .env: MP_ACCESS_TOKEN, PUBLIC_URL, PLANOS="Mensal:30:29.90:1;Trimestral*:90:79.90:1"  (opcional: MP_WEBHOOK_SECRET)
+const SALE = {
+  token: process.env.MP_ACCESS_TOKEN || '', secret: process.env.MP_WEBHOOK_SECRET || '',
+  url: (process.env.PUBLIC_URL || '').replace(/\/+$/, ''),
+  api: (process.env.MP_API_BASE || 'https://api.mercadopago.com').replace(/\/+$/, ''),
+  planos: (process.env.PLANOS || '').split(';').map(s => s.trim()).filter(Boolean).map((s, i) => {
+    const [nome = '', dias, preco, limite] = s.split(':').map(x => x.trim());
+    return {
+      id: 'p' + (i + 1), nome: nome.replace(/\*$/, '').slice(0, 40), destaque: nome.endsWith('*'),
+      dias: parseInt(dias, 10), preco: Math.round(parseFloat(String(preco).replace(',', '.')) * 100) / 100, limite: parseInt(limite, 10) || 1
+    };
+  }).filter(p => p.nome && p.dias >= 1 && p.dias <= 3650 && p.preco >= 1 && p.limite >= 1 && p.limite <= 1000)
+};
+SALE.on = !!(SALE.token && /^https?:\/\//.test(SALE.url) && SALE.planos.length);
+S.pedidos ||= [];
+
+async function mp(method, p, body) {
+  const r = await fetch(SALE.api + p, {
+    method, headers: { Authorization: 'Bearer ' + SALE.token, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(15000)
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error('MercadoPago ' + r.status + ': ' + (d.message || d.error || 'erro'));
+  return d;
+}
+
+// Cria a conta paga (só chamada com pagamento aprovado e valor conferido)
+async function entregaPedido(o, pay) {
+  const passwd = () => fs.readFileSync('/etc/passwd', 'utf8').split('\n').map(l => l.split(':')[0]);
+  let usuario = '';
+  for (let i = 0; i < 5 && !usuario; i++) { const u = 'cli' + crypto.randomBytes(3).toString('hex'); if (!passwd().includes(u)) usuario = u; }
+  if (!usuario) throw new Error('não foi possível gerar usuário único');
+  let senha = ''; for (const b of crypto.randomBytes(10)) senha += PW[b % PW.length];
+  const dia = new Date(Date.now() + o.plano.dias * DIA).toISOString().slice(0, 10);
+  await sys('useradd', ['-M', '-s', '/bin/false', '-e', dia, usuario]);
+  try { await sys('chpasswd', [], `${usuario}:${senha}\n`); } catch (e) { await sys('userdel', [usuario]).catch(() => { }); throw e; }
+  const m = readLimits(); m.set(usuario, o.plano.limite); writeLimits(m);
+  Object.assign(o, { status: 'pago', pagoEm: Date.now(), pagamento: String(pay.id), usuario, senha, expira: dia });
+  save();
+  dcUpsertUser({ usuario, senha, limite: o.plano.limite, expira: dia }).catch(e => console.warn('[DragonCore]', e.message));
+  console.log('[MP] pedido ' + o.id + ' pago · ' + o.plano.nome + ' · usuário ' + usuario);
+}
+
+const trava = new Set();
+async function aplicaPagamento(pay) {
+  const o = S.pedidos.find(x => x.id === String(pay.external_reference || ''));
+  if (!o) return 'ignorado';
+  if (trava.has(o.id)) return 'ocupado';
+  trava.add(o.id);
+  try {
+    if (pay.status === 'approved') {
+      if (o.status === 'pago') return 'ok';
+      if (pay.currency_id !== 'BRL' || Number(pay.transaction_amount) + 0.001 < o.plano.preco) {
+        o.status = 'divergente'; o.pagamento = String(pay.id); save();
+        console.warn('[MP] valor divergente no pedido ' + o.id + ': pago ' + pay.transaction_amount + ' ' + pay.currency_id + ', esperado ' + o.plano.preco);
+        return 'divergente';
+      }
+      await entregaPedido(o, pay);
+      return 'entregue';
+    }
+    if ((pay.status === 'refunded' || pay.status === 'charged_back') && o.status === 'pago' && o.pagamento === String(pay.id)) {
+      o.status = 'estornado'; save();
+      console.warn('[MP] pagamento ' + pay.id + ' ' + pay.status + ' — pedido ' + o.id + ' (usuário ' + o.usuario + ' continua ativo; revise no painel)');
+      return 'estornado';
+    }
+    return 'pendente';
+  } finally { trava.delete(o.id); }
+}
+// Plano B: se o webhook atrasar/falhar, consulta o Mercado Pago direto pelo pedido
+async function reconcilia(o) {
+  const r = await mp('GET', '/v1/payments/search?sort=date_created&criteria=desc&external_reference=' + o.id);
+  const ok = (r.results || []).find(p => p.status === 'approved');
+  if (ok) await aplicaPagamento(ok);
+}
+function assinaturaOk(req, pid) {
+  const h = String(req.get('x-signature') || ''), ts = (h.match(/ts=(\d+)/) || [])[1], v1 = (h.match(/v1=([0-9a-f]+)/) || [])[1];
+  if (!ts || !v1) return false;
+  const manifest = `id:${pid.toLowerCase()};request-id:${req.get('x-request-id') || ''};ts:${ts};`;
+  return eq(crypto.createHmac('sha256', SALE.secret).update(manifest).digest('hex'), v1);
+}
+
+if (SALE.on) {
+  app.post('/api/pedidos', rateLimit({
+    windowMs: 60e3, max: 6, standardHeaders: true, legacyHeaders: false, message: { error: 'Muitas tentativas. Aguarde um minuto.' }
+  }), run(async req => {
+    const plano = SALE.planos.find(p => p.id === String((req.body || {}).plano || ''));
+    if (!plano) throw fail('Plano inválido.');
+    if (S.pedidos.filter(o => o.status === 'pendente').length > 500) throw fail('Muitos pedidos em aberto. Tente mais tarde.');
+    const id = crypto.randomBytes(12).toString('hex'), volta = SALE.url + '/teste?pedido=' + id;
+    const r = await mp('POST', '/checkout/preferences', {
+      items: [{ id: plano.id, title: ('Acesso ' + plano.nome + ' · ' + plano.dias + ' dias').slice(0, 250), quantity: 1, unit_price: plano.preco, currency_id: 'BRL' }],
+      external_reference: id, notification_url: SALE.url + '/api/mp/webhook',
+      back_urls: { success: volta, pending: volta, failure: volta }, auto_return: 'approved'
+    });
+    const url = r.init_point;
+    if (!url) throw new Error('MercadoPago não devolveu o link de pagamento');
+    S.pedidos.push({ id, plano: { nome: plano.nome, dias: plano.dias, preco: plano.preco, limite: plano.limite }, status: 'pendente', criado: Date.now(), pref: r.id, url });
+    save();
+    return { id, url };
+  }));
+
+  app.get('/api/pedidos/:id', rateLimit({
+    windowMs: 60e3, max: 40, standardHeaders: true, legacyHeaders: false, message: { error: 'Muitas consultas. Aguarde um instante.' }
+  }), run(async req => {
+    const id = String(req.params.id || ''), o = /^[0-9a-f]{24}$/.test(id) && S.pedidos.find(x => x.id === id);
+    if (!o) throw fail('Pedido não encontrado.');
+    if (o.status === 'pendente' && Date.now() - (o.ck || 0) > 8000) { o.ck = Date.now(); await reconcilia(o).catch(e => console.warn('[MP] consulta:', e.message)); }
+    const out = { status: o.status, plano: o.plano.nome, dias: o.plano.dias };
+    if (o.status === 'pendente') out.url = o.url;
+    if (o.status === 'pago') { out.usuario = o.usuario; out.expira = o.expira; out.limite = o.plano.limite; if (o.senha) out.senha = o.senha; }
+    return out;
+  }));
+
+  app.post('/api/mp/webhook', rateLimit({ windowMs: 60e3, max: 120, standardHeaders: false, legacyHeaders: false }), async (req, res) => {
+    try {
+      const q = req.query || {}, b = req.body || {};
+      const type = String(b.type || q.type || q.topic || ''), pid = String((b.data && b.data.id) || q['data.id'] || (q.topic === 'payment' ? q.id : '') || '');
+      if (type !== 'payment' || !/^\d{1,20}$/.test(pid)) return res.sendStatus(200);
+      if (SALE.secret && !assinaturaOk(req, pid)) { console.warn('[MP] webhook com assinatura inválida (confira MP_WEBHOOK_SECRET)'); return res.sendStatus(401); }
+      const pay = await mp('GET', '/v1/payments/' + pid);
+      await aplicaPagamento(pay);
+      res.sendStatus(200);
+    } catch (e) { console.error('[MP] webhook:', e.message); res.sendStatus(500); }
+  });
+
+  setInterval(() => {
+    const now = Date.now(), n = S.pedidos.length; let ch = false;
+    for (const o of S.pedidos) if (o.senha && o.pagoEm && now - o.pagoEm > DIA) { delete o.senha; ch = true; }
+    S.pedidos = S.pedidos.filter(o => !(o.status === 'pendente' && now - o.criado > 3 * DIA));
+    if (ch || n !== S.pedidos.length) save();
+  }, 10 * 60e3).unref();
+  console.log('Vendas online (Mercado Pago) ativas · ' + SALE.planos.length + ' plano(s) · webhook em ' + SALE.url + '/api/mp/webhook');
+} else if (process.env.MP_ACCESS_TOKEN || process.env.PLANOS) {
+  console.warn('[MP] vendas desativadas: confira MP_ACCESS_TOKEN, PUBLIC_URL e PLANOS no .env');
+}
+
+// Lista de vendas para o painel (somente admin)
+app.get('/api/vendas', auth, adminOnly, (req, res) => {
+  const now = Date.now(), rows = S.pedidos.slice().sort((a, b) => b.criado - a.criado).slice(0, 300).map(o => ({
+    id: o.id, plano: o.plano.nome, dias: o.plano.dias, preco: o.plano.preco, status: o.status, criado: o.criado, pagoEm: o.pagoEm || null, usuario: o.usuario || null
+  }));
+  const pagos = S.pedidos.filter(o => o.status === 'pago'), mes = pagos.filter(o => o.pagoEm > now - 30 * DIA);
+  res.json({
+    ativo: SALE.on, rows,
+    totais: { vendas30: mes.length, valor30: Math.round(mes.reduce((a, o) => a + o.plano.preco, 0) * 100) / 100, pendentes: S.pedidos.filter(o => o.status === 'pendente').length, vendasTotal: pagos.length }
+  });
+});
 
 app.listen(PORT, HOST, () => console.log(`Painel em http://${HOST}:${PORT}`));
