@@ -2,117 +2,334 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#07050f">
 <title>Painel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=traffic-v1">
+<link rel="stylesheet" href="/style.css?v=v4">
 </head>
 <body>
+
+<!-- Ícones (sprite) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1.5"/><rect width="7" height="5" x="14" y="3" rx="1.5"/><rect width="7" height="9" x="14" y="12" rx="1.5"/><rect width="7" height="5" x="3" y="16" rx="1.5"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+    <symbol id="i-store" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+    <symbol id="i-flask" viewBox="0 0 24 24"><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></symbol>
+    <symbol id="i-ram" viewBox="0 0 24 24"><path d="M6 19v-3"/><path d="M10 19v-3"/><path d="M14 19v-3"/><path d="M18 19v-3"/><path d="M8 11V9"/><path d="M16 11V9"/><path d="M12 11V9"/><path d="M2 15h20"/><path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v1.1a2 2 0 0 0 0 3.8V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5.1a2 2 0 0 0 0-3.8z"/></symbol>
+    <symbol id="i-net" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.86a10 10 0 0 1 14 0"/><path d="M8.5 16.43a5 5 0 0 1 7 0"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-calplus" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><path d="M21 13V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8"/><path d="M3 10h18"/><path d="M19 16v6"/><path d="M16 19h6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-server" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01"/><path d="M6 18h.01"/></symbol>
+    <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  </defs>
+</svg>
+
+<!-- ========== LOGIN ========== -->
 <main id="login" class="login" hidden>
-  <div class="login-glow" aria-hidden="true"></div>
-  <form id="loginForm" class="card login-card">
-    <div class="login-head">
-      <div class="logo" aria-hidden="true">P</div>
-      <div><h1>Painel</h1><p class="muted">Gestão de usuários e revendas</p></div>
-    </div>
-    <label>Usuário<input name="user" autocomplete="username" required placeholder="admin"></label>
-    <label>Senha<input name="pass" type="password" autocomplete="current-password" required placeholder="••••••••"></label>
-    <p id="loginErr" class="err" role="alert"></p>
-    <button class="btn primary" type="submit">Entrar</button>
-  </form>
+  <section class="login-art" aria-hidden="true">
+    <div class="orb o1"></div><div class="orb o2"></div>
+    <div class="brand lg"><div class="logo">P</div><span>Painel</span></div>
+    <h2>Todos os seus acessos,<br>num só lugar.</h2>
+    <ul>
+      <li><svg class="ic"><use href="#i-shield"/></svg> Contas, validade e limites sob controle</li>
+      <li><svg class="ic"><use href="#i-activity"/></svg> Quem está online, em tempo real</li>
+      <li><svg class="ic"><use href="#i-zap"/></svg> Consumo, ping e velocidade da VPS</li>
+    </ul>
+  </section>
+  <section class="login-side">
+    <form id="loginForm" class="login-card">
+      <div class="brand"><div class="logo">P</div><span>Painel</span></div>
+      <h1>Entrar</h1>
+      <p class="muted">Acesse com o seu usuário e senha.</p>
+      <label class="field">Usuário<input name="user" autocomplete="username" required placeholder="admin"></label>
+      <label class="field">Senha<input name="pass" type="password" autocomplete="current-password" required placeholder="••••••••"></label>
+      <p id="loginErr" class="err" role="alert"></p>
+      <button class="btn primary lg" type="submit">Entrar</button>
+    </form>
+  </section>
 </main>
 
-<div id="app" hidden>
-  <div class="dashboard-container">
-    <header class="top-navbar">
-      <div class="brand"><div class="logo sm" aria-hidden="true">P</div><div><h1>Painel <span id="who" class="pill" hidden></span></h1><span class="brand-subtitle">Central de gerenciamento</span></div></div>
-      <nav class="tabs" aria-label="Navegação principal">
-        <button class="tab on" data-v="users" type="button">Usuários</button>
-        <button class="tab" data-v="online" type="button">Online <span id="onCount" class="pill badge-online">0</span></button>
-        <button class="tab" data-v="rev" id="tabRev" type="button">Revendas</button>
-      </nav>
-      <div class="bar-actions">
-        <label class="search-wrap"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Buscar usuário…" aria-label="Buscar usuário"></label>
-        <button id="testBtn" class="btn test" type="button" title="Cria um usuário de teste rápido">Criar teste</button>
-        <button id="newBtn" class="btn primary" type="button"><span class="plus" aria-hidden="true">+</span> Novo usuário</button>
-        <button id="logoutBtn" class="btn logout-top" type="button" title="Sair do sistema" aria-label="Sair do sistema">↪</button>
+<!-- ========== APP ========== -->
+<div id="app" class="shell" hidden>
+
+  <aside class="side">
+    <div class="brand"><div class="logo">P</div><span>Painel</span></div>
+
+    <nav class="nav" aria-label="Navegação principal">
+      <button class="nav-item on" data-v="home" type="button"><svg class="ic"><use href="#i-home"/></svg><span>Visão geral</span></button>
+      <button class="nav-item" data-v="users" type="button"><svg class="ic"><use href="#i-users"/></svg><span>Usuários</span><em id="navUsers" class="count">0</em></button>
+      <button class="nav-item" data-v="online" type="button"><svg class="ic"><use href="#i-activity"/></svg><span>Online</span><em id="onCount" class="count live">0</em></button>
+      <button class="nav-item" data-v="rev" id="tabRev" type="button"><svg class="ic"><use href="#i-store"/></svg><span>Revendas</span></button>
+      <button class="nav-item" data-v="sales" id="tabSales" type="button"><svg class="ic"><use href="#i-coin"/></svg><span>Vendas</span></button>
+    </nav>
+
+    <div class="side-foot">
+      <div class="me">
+        <div class="me-av" id="meAv">A</div>
+        <div class="me-txt"><strong id="meName">admin</strong><span id="meRole">Administrador</span></div>
+      </div>
+      <button id="logoutBtn" class="icon-btn" type="button" title="Sair" aria-label="Sair"><svg class="ic"><use href="#i-logout"/></svg></button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="title">
+        <h1 id="pageTitle">Visão geral</h1>
+        <p id="pageSub">Resumo da sua operação em tempo real.</p>
+      </div>
+      <div class="top-actions">
+        <button id="testBtn" class="btn" type="button" title="Cria um usuário de teste rápido"><svg class="ic"><use href="#i-flask"/></svg><span>Criar teste</span></button>
+        <button id="newBtn" class="btn primary" type="button"><svg class="ic"><use href="#i-plus"/></svg><span id="newLbl">Novo usuário</span></button>
+        <button id="logoutTop" class="icon-btn only-mobile" type="button" title="Sair" aria-label="Sair"><svg class="ic"><use href="#i-logout"/></svg></button>
       </div>
     </header>
 
-    <section id="stats" class="stats metrics-grid" hidden>
-      <div class="stat metric-card"><span class="metric-icon purple">◈</span><div><span class="stat-l">Usuários Totais</span><span class="stat-n" id="stTotal">0</span></div><span class="metric-trend">Ativos no painel</span></div>
-      <div class="stat warn metric-card"><span class="metric-icon amber">◷</span><div><span class="stat-l">Vencem em 7 dias</span><span class="stat-n" id="stSoon">0</span></div><span class="metric-trend">Acompanhe os prazos</span></div>
-      <div class="stat bad metric-card"><span class="metric-icon red">!</span><div><span class="stat-l">Expirados</span><span class="stat-n" id="stExp">0</span></div><span class="metric-trend">Precisam de atenção</span></div>
-    </section>
+    <div class="content">
 
-    <main id="v-users" class="main-content-grid view-panel">
-      <section class="glass-panel traffic-panel">
-        <div class="panel-header"><div><p class="eyebrow">MONITORAMENTO REAL</p><h2 class="panel-title">Consumo da VPS em Tempo Real</h2></div><span class="live-label"><i></i> Atualizado a cada 5s</span></div>
-        <div class="chart-card" aria-label="Gráfico visual de conexões recentes">
-          <div class="chart-y"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div>
-          <div class="chart-area"><div class="chart-grid"></div><svg class="line-chart" viewBox="0 0 700 260" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="areaFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#a855f7" stop-opacity=".35"/><stop offset="1" stop-color="#a855f7" stop-opacity="0"/></linearGradient><linearGradient id="lineStroke"><stop stop-color="#ec4899"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs><path class="chart-area-fill" d="M0,214 C55,190 82,206 125,164 S190,174 230,137 S292,161 334,118 S395,143 440,96 S505,120 540,75 S620,103 700,42 L700,260 L0,260 Z"/><path class="chart-line" d="M0,214 C55,190 82,206 125,164 S190,174 230,137 S292,161 334,118 S395,143 440,96 S505,120 540,75 S620,103 700,42"/></svg><div class="chart-x"><span>10:00</span><span>10:15</span><span>10:30</span><span>10:45</span><span>11:00</span><span>Agora</span></div></div>
+      <!-- ===== VISÃO GERAL ===== -->
+      <section id="v-home" class="view">
+        <div class="strip">
+          <span class="strip-dot" id="stripDot"></span>
+          <strong id="stripState">Conectando ao servidor…</strong>
+          <span class="strip-sep"></span>
+          <span id="stripInfo" class="muted">—</span>
         </div>
-        <div class="chart-footer"><span><i class="dot purple-dot"></i> Conexões simultâneas</span><strong id="chartOnline">0 online agora</strong><span class="metric-live"><i class="dot cpu-dot"></i> CPU <b id="metricCpu">—</b></span><span class="metric-live"><i class="dot ram-dot"></i> RAM <b id="metricRam">—</b></span><span class="metric-live"><i class="dot net-dot"></i> Rede <b id="metricNet">—</b></span><span class="chart-status"><i></i> Sistema estável</span></div>
 
-        <div class="nettools">
-          <div class="nettool-card">
-            <div class="nettool-head">
-              <span class="metric-icon cyan">⏱</span>
-              <div>
-                <strong>Ping da VPS</strong>
-                <span class="muted">Atualiza automático · 1.1.1.1</span>
+        <div class="kpis">
+          <button class="kpi accent" data-go="online" type="button">
+            <span class="kpi-ic"><svg class="ic"><use href="#i-activity"/></svg></span>
+            <span class="kpi-l">Online agora</span>
+            <span class="kpi-n" id="kOnline">0</span>
+            <span class="kpi-h" id="kOnlineH">conexões ativas</span>
+          </button>
+          <button class="kpi" data-go="users" data-filter="all" type="button">
+            <span class="kpi-ic"><svg class="ic"><use href="#i-users"/></svg></span>
+            <span class="kpi-l">Usuários</span>
+            <span class="kpi-n" id="kTotal">0</span>
+            <span class="kpi-h" id="kTotalH">contas cadastradas</span>
+          </button>
+          <button class="kpi warn" data-go="users" data-filter="soon" type="button">
+            <span class="kpi-ic"><svg class="ic"><use href="#i-clock"/></svg></span>
+            <span class="kpi-l">Vencem em 7 dias</span>
+            <span class="kpi-n" id="kSoon">0</span>
+            <span class="kpi-h">renove antes de vencer</span>
+          </button>
+          <button class="kpi bad" data-go="users" data-filter="expired" type="button">
+            <span class="kpi-ic"><svg class="ic"><use href="#i-alert"/></svg></span>
+            <span class="kpi-l">Expirados</span>
+            <span class="kpi-n" id="kExp">0</span>
+            <span class="kpi-h">precisam de atenção</span>
+          </button>
+        </div>
+
+        <div class="grid-main">
+          <article class="card monitor">
+            <div class="card-h">
+              <div><p class="eyebrow">Monitoramento</p><h2>Recursos da VPS</h2></div>
+              <span class="live"><i></i> ao vivo · 3s</span>
+            </div>
+
+            <div class="metric-tabs" role="tablist" aria-label="Métrica exibida no gráfico">
+              <button class="metric on" data-m="cpu" role="tab" aria-selected="true" type="button">
+                <span class="m-l"><svg class="ic"><use href="#i-cpu"/></svg> CPU</span>
+                <span class="m-n"><b id="mCpu">—</b><small>%</small></span>
+                <span class="m-bar"><i id="mCpuBar"></i></span>
+              </button>
+              <button class="metric" data-m="ram" role="tab" aria-selected="false" type="button">
+                <span class="m-l"><svg class="ic"><use href="#i-ram"/></svg> Memória</span>
+                <span class="m-n"><b id="mRam">—</b><small>%</small></span>
+                <span class="m-bar"><i id="mRamBar"></i></span>
+              </button>
+              <button class="metric" data-m="net" role="tab" aria-selected="false" type="button">
+                <span class="m-l"><svg class="ic"><use href="#i-net"/></svg> Rede</span>
+                <span class="m-n"><b id="mNet">—</b><small>Mb/s</small></span>
+                <span class="m-split"><span class="rx"><svg class="ic"><use href="#i-down"/></svg><b id="mRx">—</b></span><span class="tx"><svg class="ic"><use href="#i-up"/></svg><b id="mTx">—</b></span></span>
+              </button>
+            </div>
+
+            <div class="chart" id="chart">
+              <div class="chart-y" id="chartY"><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0</span></div>
+              <div class="chart-plot">
+                <div class="chart-grid"><i></i><i></i><i></i><i></i><i></i></div>
+                <svg id="chartSvg" viewBox="0 0 600 200" preserveAspectRatio="none" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="gA" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#a855f7" stop-opacity=".38"/><stop offset="1" stop-color="#a855f7" stop-opacity="0"/></linearGradient>
+                    <linearGradient id="gB" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#22d3ee" stop-opacity=".28"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0"/></linearGradient>
+                  </defs>
+                  <path id="areaA" class="area" fill="url(#gA)" d=""/>
+                  <path id="areaB" class="area" fill="url(#gB)" d=""/>
+                  <path id="lineB" class="line b" d=""/>
+                  <path id="lineA" class="line a" d=""/>
+                </svg>
+                <span class="chart-dot" id="chartDot" hidden></span>
               </div>
+              <div class="chart-x"><span>−3 min</span><span>−2 min</span><span>−1 min</span><span>agora</span></div>
             </div>
-            <div class="nettool-stats">
-              <div><small>Média</small><b id="pingAvg">—</b></div>
-              <div><small>Mín</small><b id="pingMin">—</b></div>
-              <div><small>Máx</small><b id="pingMax">—</b></div>
-              <div><small>Perda</small><b id="pingLoss">—</b></div>
-            </div>
-          </div>
-          <div class="nettool-card wide">
-            <div class="nettool-head">
-              <span class="metric-icon green">⚡</span>
-              <div>
-                <strong>Speedtest (Ookla)</strong>
-                <span class="muted" id="speedMeta">Atualiza a cada 5 min · automático</span>
+            <div class="chart-legend" id="chartLegend"></div>
+          </article>
+
+          <div class="stack">
+            <article class="card net-card">
+              <div class="card-h">
+                <div><p class="eyebrow">Latência</p><h2>Ping da VPS</h2></div>
+                <span id="pingBadge" class="pill off">aguardando</span>
               </div>
-              <button type="button" class="btn nettool-btn" id="btnSpeed" title="Forçar novo teste agora">Rodar agora</button>
-            </div>
-            <div class="nettool-stats speed-stats">
-              <div><small>Download</small><b id="speedDown">—</b></div>
-              <div><small>Upload</small><b id="speedUp">—</b></div>
-              <div><small>Latência</small><b id="speedLat">—</b></div>
-              <div><small>Jitter</small><b id="speedJit">—</b></div>
-              <div><small>Perda</small><b id="speedLoss">—</b></div>
-            </div>
-            <div class="nettool-foot muted" id="speedServer">Aguardando primeiro teste…</div>
+              <div class="ping-row">
+                <div class="big"><b id="pingAvg">—</b><small>ms</small></div>
+                <svg id="pingSpark" class="spark" viewBox="0 0 120 40" preserveAspectRatio="none" aria-hidden="true"><path class="area" d=""/><path class="line" d=""/></svg>
+              </div>
+              <dl class="mini">
+                <div><dt>Mín</dt><dd id="pingMin">—</dd></div>
+                <div><dt>Máx</dt><dd id="pingMax">—</dd></div>
+                <div><dt>Perda</dt><dd id="pingLoss">—</dd></div>
+                <div><dt>Alvo</dt><dd id="pingTarget">—</dd></div>
+              </dl>
+            </article>
+
+            <article class="card net-card">
+              <div class="card-h">
+                <div><p class="eyebrow">Velocidade</p><h2>Speedtest</h2></div>
+                <button type="button" class="btn sm" id="btnSpeed" title="Forçar novo teste agora"><svg class="ic"><use href="#i-reset"/></svg><span>Testar</span></button>
+              </div>
+              <div class="speed-row">
+                <div class="speed down"><span><svg class="ic"><use href="#i-down"/></svg> Download</span><div class="big"><b id="speedDown">—</b><small>Mbps</small></div></div>
+                <div class="speed up"><span><svg class="ic"><use href="#i-up"/></svg> Upload</span><div class="big"><b id="speedUp">—</b><small>Mbps</small></div></div>
+              </div>
+              <dl class="mini">
+                <div><dt>Latência</dt><dd id="speedLat">—</dd></div>
+                <div><dt>Jitter</dt><dd id="speedJit">—</dd></div>
+                <div><dt>Perda</dt><dd id="speedLoss">—</dd></div>
+              </dl>
+              <p class="foot muted" id="speedServer">Aguardando primeiro teste…</p>
+            </article>
           </div>
+        </div>
+
+        <div class="grid-two">
+          <article class="card">
+            <div class="card-h">
+              <div><p class="eyebrow">Prioridade</p><h2>Precisam de atenção</h2></div>
+              <button class="link" data-go="users" data-filter="soon" type="button">Ver todos <svg class="ic"><use href="#i-arrow"/></svg></button>
+            </div>
+            <ul id="attList" class="rows"></ul>
+            <p id="attEmpty" class="empty" hidden><span class="empty-ic ok"><svg class="ic"><use href="#i-check"/></svg></span><strong>Tudo em dia</strong><span>Nenhuma conta vencida ou perto de vencer.</span></p>
+          </article>
+
+          <article class="card">
+            <div class="card-h">
+              <div><p class="eyebrow">Agora</p><h2>Conectados</h2></div>
+              <button class="link" data-go="online" type="button">Ver todos <svg class="ic"><use href="#i-arrow"/></svg></button>
+            </div>
+            <ul id="miniOnline" class="rows"></ul>
+            <p id="miniEmpty" class="empty" hidden><span class="empty-ic"><svg class="ic"><use href="#i-activity"/></svg></span><strong>Ninguém conectado</strong><span>A lista atualiza sozinha.</span></p>
+          </article>
         </div>
       </section>
-      <section class="glass-panel profiles-panel">
-        <div class="panel-header"><div><p class="eyebrow">CONTAS</p><h2 class="panel-title">Gerenciar Perfis</h2></div><span id="profileCount" class="panel-meta">0 usuários</span></div>
-        <div id="userCards" class="user-cards-list"></div>
-        <p id="empty" class="muted empty-msg" hidden>Nenhum usuário encontrado.<br>Use “Novo usuário” para começar.</p>
-      </section>
-    </main>
 
-    <section id="v-online" class="online-view" hidden>
-      <div class="online-hero glass-panel"><div><p class="eyebrow">STATUS DA SESSÃO</p><h2 class="panel-title">Usuários conectados</h2><p class="online-subtitle">Acompanhe as conexões ativas em tempo real.</p></div><div class="online-total"><i></i><strong id="onlineTotal">0</strong><span>conectados agora</span></div></div>
-      <div id="onlineCards" class="online-grid"></div>
-      <p id="emptyOn" class="muted empty-msg online-empty" hidden><span class="empty-orb">◌</span><strong>Ninguém conectado agora</strong><span>A lista atualiza automaticamente.</span></p>
-      <div class="online-compat" aria-hidden="true"><table><tbody id="bOn"></tbody></table></div>
-    </section>
-    <section id="v-rev" class="panel legacy-panel" hidden><div class="table-scroll"><table><thead><tr><th>Revenda</th><th>Usuários</th><th>Status</th><th></th></tr></thead><tbody id="bRev"></tbody></table></div><p id="emptyRev" class="muted empty-msg" hidden>Nenhuma revenda ainda. Use “Nova revenda” para criar a primeira.</p></section>
+      <!-- ===== USUÁRIOS ===== -->
+      <section id="v-users" class="view" hidden>
+        <div class="toolbar">
+          <label class="search"><svg class="ic"><use href="#i-search"/></svg><input id="search" type="search" placeholder="Buscar usuário…" aria-label="Buscar usuário" autocomplete="off"></label>
+          <div class="chips" id="chips" role="group" aria-label="Filtrar por situação">
+            <button class="chip on" data-f="all" type="button">Todos <em id="cAll">0</em></button>
+            <button class="chip" data-f="active" type="button">Ativos <em id="cActive">0</em></button>
+            <button class="chip" data-f="soon" type="button">A vencer <em id="cSoon">0</em></button>
+            <button class="chip" data-f="expired" type="button">Expirados <em id="cExp">0</em></button>
+            <button class="chip" data-f="blocked" type="button">Bloqueados <em id="cBlk">0</em></button>
+          </div>
+          <label class="sort">Ordenar
+            <select id="sort"><option value="name">Nome</option><option value="exp">Vencimento</option><option value="conn">Conexões</option></select>
+          </label>
+        </div>
+
+        <article class="card flush">
+          <table class="tbl" id="tbl">
+            <thead><tr><th>Usuário</th><th>Situação</th><th>Expira em</th><th>Conexões</th><th class="r">Ações</th></tr></thead>
+            <tbody id="userRows"></tbody>
+          </table>
+          <p id="empty" class="empty" hidden><span class="empty-ic"><svg class="ic"><use href="#i-users"/></svg></span><strong id="emptyT">Nenhum usuário encontrado</strong><span id="emptyS">Use “Novo usuário” para começar.</span></p>
+        </article>
+      </section>
+
+      <!-- ===== ONLINE ===== -->
+      <section id="v-online" class="view" hidden>
+        <div class="hero card">
+          <div><p class="eyebrow">Sessões</p><h2>Usuários conectados</h2><p class="muted">A lista e o tempo online atualizam sozinhos. Ajuste a validade direto no cartão.</p></div>
+          <div class="hero-n"><span class="pulse"></span><b id="onlineTotal">0</b><small>conectados</small></div>
+        </div>
+        <div id="onlineCards" class="online-grid"></div>
+        <p id="emptyOn" class="empty card" hidden><span class="empty-ic"><svg class="ic"><use href="#i-activity"/></svg></span><strong>Ninguém conectado agora</strong><span>Quando alguém conectar, aparece aqui na hora.</span></p>
+      </section>
+
+      <!-- ===== REVENDAS ===== -->
+      <section id="v-rev" class="view" hidden>
+        <article class="card flush">
+          <table class="tbl rev" id="tblRev">
+            <thead><tr><th>Revenda</th><th>Uso do limite</th><th>Situação</th><th class="r">Ações</th></tr></thead>
+            <tbody id="bRev"></tbody>
+          </table>
+          <p id="emptyRev" class="empty" hidden><span class="empty-ic"><svg class="ic"><use href="#i-store"/></svg></span><strong>Nenhuma revenda ainda</strong><span>Use “Nova revenda” para criar a primeira.</span></p>
+        </article>
+      </section>
+
+
+      <!-- ===== VENDAS ===== -->
+      <section id="v-sales" class="view" hidden>
+        <p id="salesOff" class="strip" hidden><span class="strip-dot wait"></span><strong>Vendas online desativadas</strong><span class="strip-sep"></span><span class="muted">Configure MP_ACCESS_TOKEN, PUBLIC_URL e PLANOS no .env e reinicie o painel.</span></p>
+        <div class="kpis">
+          <div class="kpi accent"><span class="kpi-ic"><svg class="ic"><use href="#i-coin"/></svg></span><span class="kpi-l">Faturamento (30 dias)</span><span class="kpi-n" id="sVal">R$ 0</span><span class="kpi-h">pagamentos aprovados</span></div>
+          <div class="kpi"><span class="kpi-ic"><svg class="ic"><use href="#i-check"/></svg></span><span class="kpi-l">Vendas (30 dias)</span><span class="kpi-n" id="sQtd">0</span><span class="kpi-h" id="sTotalH">no total: 0</span></div>
+          <div class="kpi warn"><span class="kpi-ic"><svg class="ic"><use href="#i-clock"/></svg></span><span class="kpi-l">Aguardando pagamento</span><span class="kpi-n" id="sPend">0</span><span class="kpi-h">checkouts abertos</span></div>
+        </div>
+        <article class="card flush">
+          <table class="tbl sales" id="tblSales">
+            <thead><tr><th>Quando</th><th>Plano</th><th>Valor</th><th>Situação</th><th>Usuário</th></tr></thead>
+            <tbody id="bSales"></tbody>
+          </table>
+          <p id="emptySales" class="empty" hidden><span class="empty-ic"><svg class="ic"><use href="#i-coin"/></svg></span><strong>Nenhuma venda ainda</strong><span>As compras feitas na página /teste aparecem aqui.</span></p>
+        </article>
+      </section>
+    </div>
   </div>
 </div>
 
-<dialog id="dlg"><form id="form" method="dialog" class="card dlg-card"><h2 id="dlgTitle"></h2><div id="fields"></div><p id="formErr" class="err" role="alert"></p><div class="row"><button type="button" class="btn" id="cancel">Cancelar</button><button class="btn primary" type="submit">Salvar</button></div></form></dialog>
-<dialog id="testDlg"><div class="card dlg-card"><h2>Usuário de teste criado</h2><p class="muted">Guarde esses dados — a senha não será mostrada de novo.</p><div class="cred-box"><div><span class="muted">Usuário</span><code id="testUser"></code></div><div><span class="muted">Senha</span><code id="testPass"></code></div><div><span class="muted">Expira</span><code id="testExp"></code></div></div><label class="copy-label">Texto completo<textarea id="testCopyArea" readonly rows="6"></textarea></label><div class="row"><button type="button" class="btn" id="testCopy">Copiar tudo</button><button type="button" class="btn primary" id="testOk">Ok</button></div></div></dialog>
-<div id="toast" role="status"></div>
-<script src="/app.js?v=traffic-v1"></script>
+<!-- Menu flutuante de ações -->
+<div id="menu" class="menu" role="menu" hidden></div>
+
+<!-- Diálogos -->
+<dialog id="dlg"><form id="form" method="dialog" class="dlg-card"><h2 id="dlgTitle"></h2><div id="fields" class="fields"></div><p id="formErr" class="err" role="alert"></p><div class="row"><button type="button" class="btn" id="cancel">Cancelar</button><button class="btn primary" type="submit">Salvar</button></div></form></dialog>
+
+<dialog id="cfDlg"><div class="dlg-card"><h2 id="cfTitle"></h2><p id="cfText" class="muted"></p><div class="row"><button type="button" class="btn" id="cfNo">Cancelar</button><button type="button" class="btn primary" id="cfYes">Confirmar</button></div></div></dialog>
+
+<dialog id="testDlg"><div class="dlg-card"><h2>Usuário de teste criado</h2><p class="muted">Guarde esses dados — a senha não será mostrada de novo.</p><div class="cred-box"><div><span>Usuário</span><code id="testUser"></code></div><div><span>Senha</span><code id="testPass"></code></div><div><span>Expira</span><code id="testExp"></code></div></div><label class="field">Texto completo<textarea id="testCopyArea" readonly rows="5"></textarea></label><div class="row"><button type="button" class="btn" id="testCopy"><svg class="ic"><use href="#i-copy"/></svg> Copiar tudo</button><button type="button" class="btn primary" id="testOk">Ok</button></div></div></dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="/app.js?v=v4"></script>
 </body>
 </html>
