@@ -253,7 +253,7 @@ function ramUsagePercent() {
   return (total - free) / total * 100;
 }
 
-// ===== Monitoramento contínuo: ping + speedtest (speedtest-go) =====
+// ===== Monitoramento contínuo: ping + speedtest (Ookla / speedtest-go / speedtest-cli / Cloudflare) =====
 const netStatus = {
   ping: { avg: null, min: null, max: null, loss: 0, at: 0, error: null },
   speed: { download: null, upload: null, latency: null, jitter: null, packetLoss: null, server: null, isp: null, resultUrl: null, at: 0, running: false, error: null },
@@ -279,89 +279,84 @@ async function doPing() {
   }
 }
 
+// Motores, em ordem (SPEEDTEST_ENGINE=auto): Ookla "speedtest" (speedtest.net) → speedtest-go → speedtest-cli (python) → Cloudflare.
+// Se o primeiro falhar ou não existir na VPS, o painel passa sozinho para o próximo. SPEEDTEST_ENGINE=ookla|go|cli|cloudflare fixa um só.
+const SPEED_ENGINE = (process.env.SPEEDTEST_ENGINE || 'auto').toLowerCase();
+const r2 = v => Math.round(Number(v) * 100) / 100;
+const num = v => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+const ms = v => { const n = num(v); return n == null ? null : r2(n > 1e5 ? n / 1e6 : n); };   // ns → ms (ou já em ms)
+const lastLine = s => String(s || '').trim().split('\n').filter(Boolean).slice(-1)[0] || '';
+const mbps = v => { const n = num(v); return n == null ? null : r2(n > 20000 ? n * 8 / 1e6 : n); };  // aceita Mbps ou bytes/s
+
+async function runBin(names, args, timeout) {
+  let last;
+  for (const c of names) {
+    try { return await execF(c, args, { timeout, maxBuffer: 16e6, env: { ...process.env, HOME: process.env.HOME || '/root' } }); }
+    catch (e) { last = e; if (e.code !== 'ENOENT') break; }
+  }
+  const e = last || new Error('não encontrado');
+  throw Object.assign(new Error(e.code === 'ENOENT' ? 'não instalado' : (lastLine(e.stderr) || lastLine(e.message) || 'falhou')), { missing: e.code === 'ENOENT' });
+}
+const jsonOf = out => { const i = out.indexOf('{'), j = out.lastIndexOf('}'); return JSON.parse(out.slice(i, j + 1)); };
+
+function parseSpeed(j) {
+  if (j && j.type === 'result' || (j && j.download && typeof j.download === 'object')) {   // Ookla (speedtest.net)
+    return { download: mbps((j.download.bandwidth * 8) / 1e6), upload: mbps((j.upload.bandwidth * 8) / 1e6), latency: ms(j.ping && j.ping.latency), jitter: ms(j.ping && j.ping.jitter),
+      packetLoss: num(j.packetLoss), server: j.server ? [j.server.name, j.server.location].filter(Boolean).join(' - ') : null, isp: j.isp || null, resultUrl: (j.result && j.result.url) || null };
+  }
+  if (j && j.servers) {   // speedtest-go
+    const s = j.servers[0] || {}, pl = s.packet_loss || {};
+    return { download: mbps(s.dl_speed), upload: mbps(s.ul_speed), latency: ms(s.latency), jitter: ms(s.jitter),
+      packetLoss: pl.lost != null && pl.sent > 0 ? r2(pl.lost / pl.sent * 100) : null,
+      server: s.name ? s.name + (s.sponsor ? ' - ' + s.sponsor : '') : null, isp: (j.user_info && (j.user_info.isp || j.user_info.Isp)) || null, resultUrl: null };
+  }
+  if (j && j.download != null && j.server) {   // speedtest-cli (python): bits/s
+    return { download: r2(j.download / 1e6), upload: r2(j.upload / 1e6), latency: ms(j.ping), jitter: null, packetLoss: null,
+      server: [j.server.name, j.server.sponsor].filter(Boolean).join(' - ') || null, isp: (j.client && j.client.isp) || null, resultUrl: j.share || null };
+  }
+  throw new Error('saída desconhecida');
+}
+
+const SPEED_ENGINES = {
+  ookla: async () => {
+    try { return parseSpeed(jsonOf(await runBin(['speedtest'], ['--accept-license', '--accept-gdpr', '-f', 'json'], 100000))); }
+    catch (e) { if (e.missing) throw e; return parseSpeed(jsonOf(await runBin(['speedtest'], ['--json'], 100000))); }   // "speedtest" do pip (speedtest-cli)
+  },
+  go: async () => parseSpeed(jsonOf(await runBin(['speedtest-go', (process.env.HOME || '/root') + '/go/bin/speedtest-go', '/usr/local/bin/speedtest-go'], ['--json'], 120000))),
+  cli: async () => parseSpeed(jsonOf(await runBin(['speedtest-cli'], ['--json'], 120000))),
+  cloudflare: async () => {
+    const dl = await runBin(['curl'], ['-o', '/dev/null', '-s', '-S', '-w', '%{speed_download} %{size_download}', '--max-time', '30', 'https://speed.cloudflare.com/__down?bytes=25000000'], 40000);
+    const [dBps, dSize] = dl.trim().split(/\s+/).map(Number);
+    let ul = null;
+    try {
+      const f = require('path').join(require('os').tmpdir(), 'painel-up.bin');
+      if (!fs.existsSync(f)) fs.writeFileSync(f, crypto.randomBytes(8 * 1024 * 1024));
+      const up = await runBin(['curl'], ['-o', '/dev/null', '-s', '-S', '-w', '%{speed_upload} %{size_upload}', '--max-time', '30', '-H', 'Content-Type: application/octet-stream', '--data-binary', '@' + f, 'https://speed.cloudflare.com/__up'], 40000);
+      const [uBps, uSize] = up.trim().split(/\s+/).map(Number); if (uSize > 0) ul = r2(uBps * 8 / 1e6);
+    } catch { }
+    if (!(dSize > 0)) throw new Error('sem resposta da Cloudflare');
+    return { download: r2(dBps * 8 / 1e6), upload: ul, latency: netStatus.ping.avg, jitter: null, packetLoss: netStatus.ping.loss, server: 'Cloudflare', isp: null, resultUrl: null };
+  }
+};
+
 async function doSpeedtest() {
   if (netStatus.speed.running) return;
   netStatus.speed.running = true;
+  const order = SPEED_ENGINE !== 'auto' && SPEED_ENGINES[SPEED_ENGINE] ? [SPEED_ENGINE] : ['ookla', 'go', 'cli', 'cloudflare'];
+  const fails = [];
   try {
-    // Preferência: speedtest-go (muito mais estável, sem rate-limit da Ookla)
-    // Tenta no PATH e também em ~/go/bin
-    let out;
-    try {
-      out = await sys('speedtest-go', ['--json'], undefined, 120000);
-    } catch (e1) {
-      out = await sys(process.env.HOME + '/go/bin/speedtest-go', ['--json'], undefined, 120000);
+    for (const name of order) {
+      try {
+        const r = await SPEED_ENGINES[name]();
+        if (!(r.download > 0) && !(r.upload > 0)) throw new Error('resultado vazio');
+        netStatus.speed = { ...r, engine: name, at: Date.now(), running: false, error: null };
+        if (fails.length) console.warn('[speedtest] usando "' + name + '" · antes falhou: ' + fails.join(' | '));
+        return;
+      } catch (e) { fails.push(name + ': ' + e.message); }
     }
-    const j = JSON.parse(out);
-    const server = (j.servers && j.servers[0]) || {};
-
-    // speedtest-go entrega dl_speed / ul_speed em Mbps
-    const dl = server.dl_speed != null ? Math.round(Number(server.dl_speed) * 100) / 100 : null;
-    const ul = server.ul_speed != null ? Math.round(Number(server.ul_speed) * 100) / 100 : null;
-
-    // latency e jitter vêm como duração (ns) → converte para ms
-    const toMs = (v) => {
-      if (v == null) return null;
-      const n = Number(v);
-      // se for muito grande, assume nanosegundos
-      return n > 1e6 ? Math.round((n / 1e6) * 100) / 100 : Math.round(n * 100) / 100;
-    };
-    const lat = toMs(server.latency);
-    const jit = toMs(server.jitter);
-
-    let pl = null;
-    if (server.packet_loss) {
-      const sent = server.packet_loss.sent || server.packet_loss.Sent || 0;
-      const lost = server.packet_loss.lost || server.packet_loss.Lost || 0;
-      if (sent > 0) pl = Math.round((lost / sent) * 10000) / 100;
-    }
-
-    netStatus.speed = {
-      download: dl,
-      upload: ul,
-      latency: lat,
-      jitter: jit,
-      packetLoss: pl,
-      server: server.name ? (server.name + (server.sponsor ? ' - ' + server.sponsor : '')) : null,
-      isp: (j.user_info && (j.user_info.isp || j.user_info.Isp)) || null,
-      resultUrl: null,
-      at: Date.now(),
-      running: false,
-      error: null
-    };
-  } catch (e) {
-    // Fallback: download simples via Cloudflare
-    try {
-      const bytes = 15 * 1024 * 1024;
-      const url = `https://speed.cloudflare.com/__down?bytes=${bytes}`;
-      const out = await sys('curl', [
-        '-o', '/dev/null', '-s', '-S',
-        '-w', '%{size_download} %{speed_download} %{time_total}',
-        '--max-time', '45',
-        url
-      ], undefined, 50000);
-      const parts = out.trim().split(/\s+/);
-      const size = parseFloat(parts[0]) || 0;
-      const speedBps = parseFloat(parts[1]) || 0;
-      const mbps = (speedBps * 8) / 1e6;
-      netStatus.speed = {
-        download: size > 0 ? Math.round(mbps * 100) / 100 : null,
-        upload: null,
-        latency: netStatus.ping.avg,
-        jitter: null,
-        packetLoss: netStatus.ping.loss,
-        server: 'Cloudflare (fallback)',
-        isp: null,
-        resultUrl: null,
-        at: Date.now(),
-        running: false,
-        error: size > 0 ? null : (e.message || 'Falha no speedtest')
-      };
-    } catch (e2) {
-      netStatus.speed.running = false;
-      netStatus.speed.error = e.message || e2.message;
-      netStatus.speed.at = Date.now();
-    }
-  }
+    netStatus.speed = { ...netStatus.speed, at: Date.now(), error: fails.join(' · ') };
+    console.error('[speedtest] todos os motores falharam → ' + fails.join(' | '));
+  } finally { netStatus.speed.running = false; }
 }
 
 // loop em background
@@ -428,7 +423,8 @@ function visible(req) {
       limite: lim.get(u.usuario) ?? 1,
       revenda: own.get(u.usuario) || (S.tst && S.tst.some(t => t.u === u.usuario) ? 'teste grátis' : (S.pedidos && S.pedidos.some(p => p.usuario === u.usuario) ? 'compra online' : null)),
       blocked: !!m.blocked,
-      mbps: m.mbps || 0
+      mbps: m.mbps || 0,
+      ...xrayInfo(u.usuario)
     };
   });
   return req.session.role === 'rev' ? rows.filter(u => u.revenda === req.session.name) : rows;
@@ -436,7 +432,7 @@ function visible(req) {
 const mustOwn = (req, name) => { if (!visible(req).some(u => u.usuario === name)) throw fail('Usuário não encontrado.'); };
 app.get('/api/users', auth, run(req => {
   const q = String(req.query.q || '').slice(0, 60).toLowerCase();
-  return { rows: visible(req).filter(u => u.usuario.toLowerCase().includes(q)) };
+  return { rows: visible(req).filter(u => u.usuario.toLowerCase().includes(q)), xray: XR.on };
 }));
 app.get('/api/online', auth, (req, res) => {
   execFile('ps', ['-eo', 'etime=,args=', '--no-headers'], { maxBuffer: 4e6 }, (err, out) => {
@@ -493,7 +489,8 @@ app.post('/api/users', auth, csrf, run(async req => {
   if (rev) { S.map[usuario] = req.session.revId; save(); }
   // sincroniza no DragonCore (não bloqueia se falhar)
   dcUpsertUser({ usuario, senha, limite: n, expira: d }).catch(e => console.warn('[DragonCore]', e.message));
-  return { ok: true };
+  if (String((req.body || {}).xray) !== 'n') xrayEnsure(usuario);   // "Vincular ao Xray?" = Não pula o UUID
+  return { ok: true, ...xrayInfo(usuario) };
 }));
 app.put('/api/users/:name', auth, csrf, run(async req => {
   const u = req.params.name, b = req.body || {};
@@ -508,6 +505,7 @@ app.put('/api/users/:name', auth, csrf, run(async req => {
   const lim = readLimits().get(u) || 1;
   const exp = ('expira' in b) ? chkDate(b.expira) : (sysUsers().find(x => x.usuario === u) || {}).expira;
   dcUpsertUser({ usuario: u, senha: b.senha || undefined, limite: ('limite' in b) ? chkLimit(b.limite) : lim, expira: exp || '' }).catch(e => console.warn('[DragonCore]', e.message));
+  xrayKick(1500);
   return { ok: true };
 }));
 app.delete('/api/users/:name', auth, csrf, run(async req => {
@@ -517,9 +515,17 @@ app.delete('/api/users/:name', auth, csrf, run(async req => {
   const m = readLimits(); if (m.delete(u)) writeLimits(m);
   if (u in S.map) { delete S.map[u]; }
   if (S.meta && S.meta[u]) delete S.meta[u];
+  delete S.xray[u];
   save();
+  xrayKick(1500);
   dcDeleteUser(u).catch(e => console.warn('[DragonCore]', e.message));
   return { ok: true };
+}));
+app.post('/api/users/:name/uuid', auth, csrf, run(async req => {
+  if (!XR.on) throw fail('O UUID do V2Ray não está ativado (XRAY_ENABLED=1 no .env).');
+  const u = req.params.name; mustOwn(req, u);
+  const id = xrayEnsure(u, !!(req.body || {}).novo);
+  return { ok: true, uuid: id, link: xrayLink(u, id) };
 }));
 
 // ===== Bloquear / limitar tráfego (Linux real + usuarios.db + DragonCore) =====
@@ -600,6 +606,7 @@ app.post('/api/users/:name/block', auth, csrf, run(async req => {
       console.warn('[DragonCore] block', u, msg);
     }
   }
+  xrayKick(1500);
   return { ok: true, blocked: true, locked: true, prevExpira: meta.prevExpira || null, warning };
 }));
 
@@ -641,6 +648,7 @@ app.post('/api/users/:name/unblock', auth, csrf, run(async req => {
       console.warn('[DragonCore] unblock', u, msg);
     }
   }
+  xrayKick(1500);
   return { ok: true, blocked: false, limite: lim, expira: exp || null, warning };
 }));
 
@@ -725,6 +733,95 @@ const T = {
 S.tst ||= []; S.ips ||= {}; S.tlog ||= [];
 const PW = 'abcdefghjkmnpqrstuvwxyz23456789', DIA = 864e5;
 
+// ===== V2Ray / Xray (VLESS): o UUID nasce junto com o usuário =====
+// .env: XRAY_ENABLED=1  (opcional: XRAY_CONFIG, XRAY_INBOUND_TAG, XRAY_FLOW, XRAY_LINK, XRAY_RESTART_CMD, XRAY_BIN, XRAY_SKIP_TEST)
+// O painel guarda o UUID de cada usuário e mantém o config do Xray igual: entra quando o usuário é criado/renovado,
+// sai quando é bloqueado, expira ou é excluído. Clientes criados à mão (sem "@painel" no email) nunca são tocados.
+const XR = {
+  on: process.env.XRAY_ENABLED === '1',
+  path: process.env.XRAY_CONFIG || '/usr/local/etc/xray/config.json',
+  tag: process.env.XRAY_INBOUND_TAG || '',
+  flow: process.env.XRAY_FLOW || '',
+  bin: process.env.XRAY_BIN || 'xray',
+  restart: process.env.XRAY_RESTART_CMD || 'systemctl restart xray',
+  link: process.env.XRAY_LINK || '',
+  skipTest: process.env.XRAY_SKIP_TEST === '1'
+};
+S.xray ||= {};
+const XR_MAIL = '@painel';
+function xrayLink(usuario, uuid) {
+  if (!XR.link || !uuid) return '';
+  const host = T.host || process.env.SERVER_HOST || '';
+  return XR.link.replace(/\{uuid\}/g, uuid).replace(/\{usuario\}/g, encodeURIComponent(usuario)).replace(/\{host\}/g, host);
+}
+function xrayInfo(usuario) { const id = XR.on ? S.xray[usuario] : null; return id ? { uuid: id, link: xrayLink(usuario, id) } : {}; }
+function xrayEnsure(usuario, novo) {
+  if (!XR.on) return null;
+  if (!S.xray[usuario] || novo) { S.xray[usuario] = crypto.randomUUID(); save(); }
+  xrayKick(); return S.xray[usuario];
+}
+let xrayTimer = null, xrayBusy = false, xrayAgain = false, xrayWarned = false;
+function xrayKick(ms = 4000) {
+  if (!XR.on) return;
+  clearTimeout(xrayTimer);
+  xrayTimer = setTimeout(() => xraySync().catch(e => console.error('[Xray]', e.message)), ms);
+}
+async function xraySync() {
+  if (!XR.on) return;
+  if (xrayBusy) { xrayAgain = true; return; }
+  xrayBusy = true;
+  try { do { xrayAgain = false; await xrayApply(); } while (xrayAgain); } finally { xrayBusy = false; }
+}
+const execF = (cmd, args, opts = {}) => new Promise((ok, no) => require('child_process').execFile(cmd, args, { timeout: 20000, ...opts }, (e, out, err) => e ? no(Object.assign(e, { stderr: String(err || out || '') })) : ok(out)));
+async function xrayApply() {
+  const users = new Map(sysUsers().map(u => [u.usuario, u])), hoje = new Date().toISOString().slice(0, 10);
+  let reg = false;
+  for (const u of Object.keys(S.xray)) if (!users.has(u)) { delete S.xray[u]; reg = true; }   // usuário não existe mais
+  if (reg) save();
+  const want = new Map();
+  for (const [u, id] of Object.entries(S.xray)) {
+    const x = users.get(u);
+    if ((S.meta[u] || {}).blocked || (x.expira && x.expira < hoje)) continue;               // bloqueado ou vencido: sem acesso
+    want.set(u + XR_MAIL, id);
+  }
+  let cfg;
+  try { cfg = JSON.parse(fs.readFileSync(XR.path, 'utf8')); }
+  catch (e) { console.error('[Xray] não consegui ler ' + XR.path + ': ' + e.message + ' (o config precisa ser JSON puro, sem comentários)'); return; }
+  const inbs = (cfg.inbounds || []).filter(i => i.protocol === 'vless' && (!XR.tag || i.tag === XR.tag));
+  if (!inbs.length) { if (!xrayWarned) { xrayWarned = true; console.warn('[Xray] nenhum inbound VLESS' + (XR.tag ? ' com tag "' + XR.tag + '"' : '') + ' em ' + XR.path); } return; }
+  let changed = false, add = 0, del = 0;
+  for (const ib of inbs) {
+    ib.settings = ib.settings || {};
+    const cl = Array.isArray(ib.settings.clients) ? ib.settings.clients : [];
+    const out = cl.filter(c => !String(c.email || '').endsWith(XR_MAIL) || want.get(c.email) === c.id);
+    del += cl.length - out.length;
+    const have = new Set(out.map(c => c.email));
+    for (const [email, id] of want) if (!have.has(email)) { out.push({ id, email, level: 0, ...(XR.flow ? { flow: XR.flow } : {}) }); add++; }
+    if (out.length !== cl.length || out.some((c, i) => c !== cl[i]) || !Array.isArray(ib.settings.clients)) { ib.settings.clients = out; changed = true; }
+  }
+  if (!changed) return;
+  const st = fs.statSync(XR.path), tmp = XR.path.replace(/\.json$/, '') + '.painel-tmp.json';
+  fs.copyFileSync(XR.path, XR.path + '.painel-bak');
+  fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2) + '\n', { mode: st.mode & 0o777 });
+  try { fs.chownSync(tmp, st.uid, st.gid); } catch { }
+  if (!XR.skipTest) {
+    try { await execF(XR.bin, ['run', '-test', '-format', 'json', '-config', tmp]); }
+    catch (e) {
+      if (e.code !== 'ENOENT') { fs.rmSync(tmp, { force: true }); console.error('[Xray] config novo REPROVADO no teste, nada foi alterado: ' + String(e.stderr || e.message).trim().split('\n').slice(-3).join(' | ')); return; }
+    }
+  }
+  fs.renameSync(tmp, XR.path);
+  console.log('[Xray] config atualizado (+' + add + ' / -' + del + ' clientes) · reiniciando o Xray');
+  try { await execF('sh', ['-c', XR.restart]); } catch (e) { console.error('[Xray] falhou ao reiniciar (' + XR.restart + '): ' + String(e.stderr || e.message).trim()); }
+}
+if (XR.on) {
+  setTimeout(() => xrayKick(0), 8000).unref();
+  setInterval(() => xrayKick(0), 5 * 60e3).unref();   // pega vencimentos
+  console.log('[Xray] UUID automático ativo → ' + XR.path);
+} else if (fs.existsSync(XR.path)) {
+  console.log('[Xray] config encontrado em ' + XR.path + ' — para gerar UUID junto com o usuário, ponha XRAY_ENABLED=1 no .env');
+}
+
 async function limpaTestes() {
   const now = Date.now();
   for (const k in S.ips) if (S.ips[k] < now - DIA) delete S.ips[k];
@@ -738,6 +835,7 @@ async function limpaTestes() {
     dcDeleteUser(t.u).catch(() => { });
   }
   save();
+  xrayKick(1000);
 }
 
 if (T.on) {
@@ -784,7 +882,8 @@ if (T.on) {
     const m = readLimits(); m.set(usuario, T.limite); writeLimits(m);
     S.tst.push({ u: usuario, ate }); save();
     dcUpsertUser({ usuario, senha, limite: T.limite, expira: dia }).catch(e => console.warn('[DragonCore]', e.message));
-    return { usuario, senha, host: T.host, porta: T.sshPort, ate, horas: T.horas };
+    xrayEnsure(usuario);
+    return { usuario, senha, host: T.host, porta: T.sshPort, ate, horas: T.horas, ...xrayInfo(usuario) };
   }));
   console.log('Teste grátis em /teste (mesma porta do painel)');
 }
@@ -796,9 +895,10 @@ const SALE = {
   url: (process.env.PUBLIC_URL || '').replace(/\/+$/, ''),
   api: (process.env.MP_API_BASE || 'https://api.mercadopago.com').replace(/\/+$/, ''),
   planos: (process.env.PLANOS || '').split(';').map(s => s.trim()).filter(Boolean).map((s, i) => {
-    const [nome = '', dias, preco, limite] = s.split(':').map(x => x.trim());
+    const star = s.includes('*');   // "*" em qualquer lugar do plano = destaque
+    const [nome = '', dias, preco, limite] = s.replace(/\*/g, '').split(':').map(x => x.trim());
     return {
-      id: 'p' + (i + 1), nome: nome.replace(/\*$/, '').slice(0, 40), destaque: nome.endsWith('*'),
+      id: 'p' + (i + 1), nome: nome.slice(0, 40), destaque: star,
       dias: parseInt(dias, 10), preco: Math.round(parseFloat(String(preco).replace(',', '.')) * 100) / 100, limite: parseInt(limite, 10) || 1
     };
   }).filter(p => p.nome && p.dias >= 1 && p.dias <= 3650 && p.preco >= 1 && p.limite >= 1 && p.limite <= 1000)
@@ -829,6 +929,7 @@ async function entregaPedido(o, pay) {
   const m = readLimits(); m.set(usuario, o.plano.limite); writeLimits(m);
   Object.assign(o, { status: 'pago', pagoEm: Date.now(), pagamento: String(pay.id), usuario, senha, expira: dia });
   save();
+  xrayEnsure(usuario);
   dcUpsertUser({ usuario, senha, limite: o.plano.limite, expira: dia }).catch(e => console.warn('[DragonCore]', e.message));
   console.log('[MP] pedido ' + o.id + ' pago · ' + o.plano.nome + ' · usuário ' + usuario);
 }
@@ -899,7 +1000,7 @@ if (SALE.on) {
     if (o.status === 'pendente' && Date.now() - (o.ck || 0) > 8000) { o.ck = Date.now(); await reconcilia(o).catch(e => console.warn('[MP] consulta:', e.message)); }
     const out = { status: o.status, plano: o.plano.nome, dias: o.plano.dias };
     if (o.status === 'pendente') out.url = o.url;
-    if (o.status === 'pago') { out.usuario = o.usuario; out.expira = o.expira; out.limite = o.plano.limite; if (o.senha) out.senha = o.senha; }
+    if (o.status === 'pago') { out.usuario = o.usuario; out.expira = o.expira; out.limite = o.plano.limite; if (o.senha) out.senha = o.senha; Object.assign(out, xrayInfo(o.usuario)); }
     return out;
   }));
 
