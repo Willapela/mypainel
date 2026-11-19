@@ -95,6 +95,9 @@ dl{margin:4px 0;display:grid;gap:8px}
 .pixcode code{display:block;max-height:74px;overflow:auto;word-break:break-all;text-align:left;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;background:rgba(255,255,255,.04);border:1px solid var(--line2);border-radius:12px;padding:10px 12px;color:var(--ink2)}
 .pixcode button{min-height:44px;border:1px solid transparent;border-radius:12px;background:var(--grad);color:#fff;font:inherit;font-weight:700;cursor:pointer}
 .small{font-size:13px}
+.btn.card-btn{background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.5);color:#bfdbfe}
+.btn.card-btn:hover{background:rgba(59,130,246,.24)}
+.meios{margin:-6px 0 0;text-align:center;font-size:12px;color:var(--mut)}
 .btn.alt{margin-top:-4px;min-height:38px;font-size:13px;font-weight:600;color:var(--ink2);background:transparent;border-color:transparent;text-decoration:underline}
 .links{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;max-width:620px;width:100%;margin:0 auto}
 

@@ -70,9 +70,10 @@ function renderPlans() {
     [p.dias + (p.dias === 1 ? ' dia' : ' dias') + ' de acesso', p.limite + (p.limite === 1 ? ' conexão simultânea' : ' conexões simultâneas'), 'Liberação automática após o pagamento'].forEach(t => { const li = document.createElement('li'); li.append(icon('check'), document.createTextNode(t)); ul.append(li); });
     const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn ' + (p.destaque ? 'primary' : ''); btn.textContent = 'Pagar com Pix';
     btn.onclick = () => comprar(p, btn, 'pix');
-    const alt = document.createElement('button'); alt.type = 'button'; alt.className = 'btn alt'; alt.textContent = 'Cartão ou outros meios';
+    const alt = document.createElement('button'); alt.type = 'button'; alt.className = 'btn card-btn'; alt.textContent = 'Pagar com cartão';
     alt.onclick = () => comprar(p, alt, 'mp');
-    c.append(h, pr, per, ul, btn, alt); return c;
+    const hint = document.createElement('p'); hint.className = 'meios'; hint.textContent = 'Cartão de crédito, débito ou boleto';
+    c.append(h, pr, per, ul, btn, alt, hint); return c;
   }));
 }
 async function comprar(p, btn, metodo) {
