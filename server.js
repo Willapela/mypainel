@@ -285,6 +285,7 @@ const SPEED_ENGINE = (process.env.SPEEDTEST_ENGINE || 'auto').toLowerCase();
 const r2 = v => Math.round(Number(v) * 100) / 100;
 const num = v => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 const ms = v => { const n = num(v); return n == null ? null : r2(n > 1e5 ? n / 1e6 : n); };   // ns → ms (ou já em ms)
+const nsMs = v => { const n = num(v); return n == null ? null : r2(n / 1e6); };   // speedtest-go: sempre nanossegundos
 const lastLine = s => String(s || '').trim().split('\n').filter(Boolean).slice(-1)[0] || '';
 const mbps = v => { const n = num(v); return n == null ? null : r2(n > 20000 ? n * 8 / 1e6 : n); };  // aceita Mbps ou bytes/s
 
@@ -306,7 +307,7 @@ function parseSpeed(j) {
   }
   if (j && j.servers) {   // speedtest-go
     const s = j.servers[0] || {}, pl = s.packet_loss || {};
-    return { download: mbps(s.dl_speed), upload: mbps(s.ul_speed), latency: ms(s.latency), jitter: ms(s.jitter),
+    return { download: mbps(s.dl_speed), upload: mbps(s.ul_speed), latency: nsMs(s.latency), jitter: nsMs(s.jitter),
       packetLoss: pl.lost != null && pl.sent > 0 ? r2(pl.lost / pl.sent * 100) : null,
       server: s.name ? s.name + (s.sponsor ? ' - ' + s.sponsor : '') : null, isp: (j.user_info && (j.user_info.isp || j.user_info.Isp)) || null, resultUrl: null };
   }
@@ -906,9 +907,9 @@ const SALE = {
 SALE.on = !!(SALE.token && /^https?:\/\//.test(SALE.url) && SALE.planos.length);
 S.pedidos ||= [];
 
-async function mp(method, p, body) {
+async function mp(method, p, body, extra) {
   const r = await fetch(SALE.api + p, {
-    method, headers: { Authorization: 'Bearer ' + SALE.token, 'Content-Type': 'application/json' },
+    method, headers: { Authorization: 'Bearer ' + SALE.token, 'Content-Type': 'application/json', ...(extra || {}) },
     body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(15000)
   });
   const d = await r.json().catch(() => ({}));
@@ -980,6 +981,20 @@ if (SALE.on) {
     if (!plano) throw fail('Plano inválido.');
     if (S.pedidos.filter(o => o.status === 'pendente').length > 500) throw fail('Muitos pedidos em aberto. Tente mais tarde.');
     const id = crypto.randomBytes(12).toString('hex'), volta = SALE.url + '/teste?pedido=' + id;
+    if (String((req.body || {}).metodo) === 'pix') {
+      // Pix direto na página: QR Code + "copia e cola" (Mercado Pago /v1/payments)
+      const ate = Date.now() + 30 * 60e3, exp = new Date(ate - 3 * 3600e3).toISOString().replace('Z', '-03:00');
+      const pay = await mp('POST', '/v1/payments', {
+        transaction_amount: plano.preco, description: ('Acesso ' + plano.nome + ' · ' + plano.dias + ' dias').slice(0, 250), payment_method_id: 'pix',
+        payer: { email: 'pedido-' + id.slice(0, 10) + '@' + (new URL(SALE.url).hostname.includes('.') ? new URL(SALE.url).hostname : 'example.com') },
+        external_reference: id, notification_url: SALE.url + '/api/mp/webhook', date_of_expiration: exp
+      }, { 'X-Idempotency-Key': id });
+      const td = (pay.point_of_interaction && pay.point_of_interaction.transaction_data) || {};
+      if (!td.qr_code) throw new Error('MercadoPago não devolveu o código Pix');
+      S.pedidos.push({ id, plano: { nome: plano.nome, dias: plano.dias, preco: plano.preco, limite: plano.limite }, status: 'pendente', criado: Date.now(), metodo: 'pix', pixId: String(pay.id), pix: { codigo: td.qr_code, qr: td.qr_code_base64 || '', ate } });
+      save();
+      return { id, pix: { codigo: td.qr_code, qr: td.qr_code_base64 || '', ate } };
+    }
     const r = await mp('POST', '/checkout/preferences', {
       items: [{ id: plano.id, title: ('Acesso ' + plano.nome + ' · ' + plano.dias + ' dias').slice(0, 250), quantity: 1, unit_price: plano.preco, currency_id: 'BRL' }],
       external_reference: id, notification_url: SALE.url + '/api/mp/webhook',
@@ -999,7 +1014,7 @@ if (SALE.on) {
     if (!o) throw fail('Pedido não encontrado.');
     if (o.status === 'pendente' && Date.now() - (o.ck || 0) > 8000) { o.ck = Date.now(); await reconcilia(o).catch(e => console.warn('[MP] consulta:', e.message)); }
     const out = { status: o.status, plano: o.plano.nome, dias: o.plano.dias };
-    if (o.status === 'pendente') out.url = o.url;
+    if (o.status === 'pendente') { if (o.pix) { out.pix = o.pix; out.expirado = Date.now() > o.pix.ate + 60e3; } else out.url = o.url; }
     if (o.status === 'pago') { out.usuario = o.usuario; out.expira = o.expira; out.limite = o.plano.limite; if (o.senha) out.senha = o.senha; Object.assign(out, xrayInfo(o.usuario)); }
     return out;
   }));
