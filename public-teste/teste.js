@@ -44,7 +44,7 @@ async function gerar() {
     const r = await fetch('/api/teste', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || 'Não foi possível gerar o teste agora.');
-    const box = $('#dados'); box.replaceChildren(row('Usuário', d.usuario), row('Senha', d.senha));
+    const box = $('#dados'); box.replaceChildren(row('Usuário', d.usuario), row('Senha', d.senha)); if (d.uuid) box.append(row('UUID', d.uuid)); if (d.link) box.append(row('Link', d.link));
     countdown(d.ate);
     if (cfg.appUrl) { $('#appDl').href = cfg.appUrl; $('#appDl').textContent = cfg.appLabel || 'Baixar aplicativo'; $('#appDl').hidden = false; $('#appDl2').hidden = true; }
     $('#pre').hidden = true; $('#res').hidden = false;
@@ -68,20 +68,23 @@ function renderPlans() {
     const per = document.createElement('p'); per.className = 'per'; per.textContent = 'equivale a ' + brl(p.preco / p.dias) + ' por dia';
     const ul = document.createElement('ul');
     [p.dias + (p.dias === 1 ? ' dia' : ' dias') + ' de acesso', p.limite + (p.limite === 1 ? ' conexão simultânea' : ' conexões simultâneas'), 'Liberação automática após o pagamento'].forEach(t => { const li = document.createElement('li'); li.append(icon('check'), document.createTextNode(t)); ul.append(li); });
-    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn ' + (p.destaque ? 'primary' : ''); btn.textContent = 'Assinar agora';
-    btn.onclick = () => comprar(p, btn);
-    c.append(h, pr, per, ul, btn); return c;
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn ' + (p.destaque ? 'primary' : ''); btn.textContent = 'Pagar com Pix';
+    btn.onclick = () => comprar(p, btn, 'pix');
+    const alt = document.createElement('button'); alt.type = 'button'; alt.className = 'btn alt'; alt.textContent = 'Cartão ou outros meios';
+    alt.onclick = () => comprar(p, alt, 'mp');
+    c.append(h, pr, per, ul, btn, alt); return c;
   }));
 }
-async function comprar(p, btn) {
+async function comprar(p, btn, metodo) {
   $('#planErr').textContent = '';
   const all = [...document.querySelectorAll('#planGrid .btn')]; all.forEach(x => x.disabled = true);
-  const old = btn.textContent; btn.textContent = 'Abrindo pagamento…';
+  const old = btn.textContent; btn.textContent = metodo === 'pix' ? 'Gerando Pix…' : 'Abrindo pagamento…';
   try {
-    const r = await fetch('/api/pedidos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plano: p.id }) });
+    const r = await fetch('/api/pedidos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plano: p.id, metodo }) });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.url) throw new Error(d.error || 'Não foi possível abrir o pagamento agora. Tente de novo.');
+    if (!r.ok || !(d.url || d.pix)) throw new Error(d.error || 'Não foi possível abrir o pagamento agora. Tente de novo.');
     store.set(d.id);
+    if (d.pix) { renderPix(d.pix, 'Plano ' + p.nome + ' · ' + brl(p.preco)); acompanha(d.id); all.forEach(x => x.disabled = false); btn.textContent = old; return; }
     location.href = d.url;
   } catch (e) { $('#planErr').textContent = e.message; all.forEach(x => x.disabled = false); btn.textContent = old; }
 }
@@ -89,15 +92,33 @@ async function comprar(p, btn) {
 /* ---------- acompanhamento do pagamento ---------- */
 function showPay(state) {
   $('#pay').hidden = false;
-  ['Wait', 'Ok', 'Bad'].forEach(k => { $('#pay' + k).hidden = k !== state; });
-  const focus = state === 'Wait' || state === 'Ok';
+  ['Wait', 'Pix', 'Ok', 'Bad'].forEach(k => { $('#pay' + k).hidden = k !== state; });
+  const focus = state === 'Wait' || state === 'Pix' || state === 'Ok';
   $('#trial').hidden = focus; $('#planos').hidden = focus || !(cfg.planos || []).length;
 }
+let pixTimer = null, pixCode = '';
+function renderPix(pix, label) {
+  clearInterval(timer); clearInterval(pixTimer);
+  if (label) $('#pixInfo').textContent = label + ' — escaneie o QR Code no app do seu banco ou copie o código.';
+  const img = $('#pixQr'); if (pix.qr) { img.src = 'data:image/png;base64,' + pix.qr; img.hidden = false; } else img.hidden = true;
+  $('#pixCode').textContent = pix.codigo; pixCode = pix.codigo; $('#pixNew').hidden = true; $('#pixCopy').hidden = false;
+  $('#pixCopy').onclick = async () => { const b = $('#pixCopy'); try { await navigator.clipboard.writeText(pixCode); b.textContent = 'Código copiado!'; } catch { b.textContent = 'Selecione e copie o código'; } setTimeout(() => b.textContent = 'Copiar código Pix', 2000); };
+  $('#pixNew').onclick = () => { store.set(''); clearInterval(poll); clearInterval(pixTimer); $('#pay').hidden = true; $('#trial').hidden = false; renderPlans(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const tick = () => {
+    const s = Math.max(0, Math.round((pix.ate - Date.now()) / 1000));
+    if (!s) { clearInterval(pixTimer); $('#pixTimer').textContent = 'Esse Pix expirou. Se você já pagou, aguarde alguns segundos; senão, gere um novo.'; img.hidden = true; $('#pixCopy').hidden = true; $('#pixNew').hidden = false; return; }
+    $('#pixTimer').textContent = 'Válido por ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  };
+  tick(); pixTimer = setInterval(tick, 1000);
+  showPay('Pix'); window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 function paidView(d) {
-  clearInterval(poll);
+  clearInterval(poll); clearInterval(pixTimer);
   $('#payPlano').textContent = 'Plano ' + d.plano + ' · ' + d.dias + (d.dias === 1 ? ' dia' : ' dias') + (d.expira ? ' · válido até ' + fmtDate(d.expira) : '');
   const box = $('#payDados'); box.replaceChildren(row('Usuário', d.usuario));
   if (d.senha) box.append(row('Senha', d.senha));
+  if (d.uuid) box.append(row('UUID', d.uuid));
+  if (d.link) box.append(row('Link', d.link));
   $('#payNota').textContent = d.senha ? 'Guarde esses dados agora. Por segurança, a senha some desta página depois de 24 horas.' : 'A senha já expirou desta página. Se precisar de ajuda, chame no WhatsApp.';
   showPay('Ok'); window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -110,12 +131,13 @@ async function checa(id, first) {
     if (d.status === 'pago') return paidView(d);
     if (d.status === 'estornado') return badView('Pagamento estornado', 'Esse pagamento foi devolvido. Para voltar a usar, faça uma nova assinatura ou chame no WhatsApp.');
     if (d.status === 'divergente') return badView('Valor do pagamento diferente', 'O valor pago não confere com o plano. Chame no WhatsApp para resolvermos rápido.');
+    if (d.pix) { if (pixCode !== d.pix.codigo) renderPix(d.pix, 'Plano ' + d.plano); return; }
     showPay('Wait');
     if (d.url) { $('#payRetry').href = d.url; }
   } catch { /* tenta de novo no próximo ciclo */ }
 }
 function acompanha(id) {
-  showPay('Wait'); let n = 0; const t0 = Date.now();
+  if ($('#payPix').hidden) showPay('Wait'); let n = 0; const t0 = Date.now();
   setTimeout(() => { if (!$('#payWait').hidden && $('#payRetry').href) $('#payRetry').hidden = false; }, 20000);
   checa(id, true);
   clearInterval(poll);
@@ -125,7 +147,7 @@ function acompanha(id) {
 async function recupera(id) {
   try {
     const r = await fetch('/api/pedidos/' + encodeURIComponent(id)), d = await r.json().catch(() => ({}));
-    if (r.ok && d.status === 'pago' && d.senha) paidView(d); else store.set('');
+    if (r.ok && d.status === 'pago' && d.senha) paidView(d); else if (r.ok && d.status === 'pendente' && d.pix && !d.expirado) acompanha(id); else store.set('');
   } catch { }
 }
 

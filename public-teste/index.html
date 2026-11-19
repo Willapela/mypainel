@@ -29,6 +29,15 @@
       <p class="muted">Pode levar alguns segundos. Não feche esta página — seu acesso aparece aqui assim que o pagamento for aprovado.</p>
       <a id="payRetry" class="btn ghost" hidden>Abrir o pagamento de novo</a>
     </div>
+    <div id="payPix" hidden>
+      <h2>Pague com Pix</h2>
+      <p class="muted" id="pixInfo">Escaneie o QR Code no app do seu banco ou copie o código.</p>
+      <img id="pixQr" class="qr" alt="QR Code do Pix" width="220" height="220" hidden>
+      <div class="pixcode"><code id="pixCode"></code><button type="button" id="pixCopy">Copiar código Pix</button></div>
+      <p class="timer" id="pixTimer"></p>
+      <p class="muted small">Assim que o pagamento for confirmado, seu usuário e senha aparecem aqui sozinhos. Não feche esta página.</p>
+      <button type="button" id="pixNew" class="btn ghost" hidden>Gerar novo Pix</button>
+    </div>
     <div id="payOk" hidden>
       <div class="badge-ok"><svg><use href="#i-check"/></svg></div>
       <h2>Pagamento aprovado!</h2>
