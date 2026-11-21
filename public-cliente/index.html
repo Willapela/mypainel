@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07050f">
+<meta name="robots" content="noindex">
+<title>Área do cliente</title>
+<link rel="stylesheet" href="/cliente/cliente.css?v=v5">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-wa" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></g></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></g></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-card" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/></g></symbol>
+  <symbol id="i-gift" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></g></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></g></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></g></symbol>
+  <symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-7-7 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+<div class="orb o1"></div><div class="orb o2"></div><div class="grid-bg"></div>
+
+<header class="nav">
+  <div class="c nav-in">
+    <a class="brand" href="/cliente/"><span class="logo">P</span><span>Painel</span></a>
+    <span class="nav-sp"></span>
+    <a class="btn ghost sm" id="toTeste" href="/teste/" hidden>Teste grátis</a>
+    <button class="btn ghost sm" id="sair" type="button" hidden>Sair</button>
+  </div>
+</header>
+
+<main class="c main">
+  <!-- Entrar -->
+  <section id="vLogin" class="card login" hidden>
+    <span class="eyebrow">Área do cliente</span>
+    <h1>Acesse sua conta</h1>
+    <p class="muted">Entre com o usuário e a senha do seu acesso para ver a validade, os dados de conexão e renovar.</p>
+    <form id="fLogin">
+      <label>Usuário<input id="lu" name="usuario" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="40" required></label>
+      <label>Senha<input id="lp" name="senha" type="password" autocomplete="current-password" maxlength="64" required></label>
+      <p id="lerr" class="err" role="alert"></p>
+      <button id="lbtn" class="btn primary lg" type="submit">Entrar</button>
+    </form>
+    <p class="muted small center" id="lhelp">Ainda não tem acesso? <a href="/teste/">Gere um teste grátis</a></p>
+  </section>
+
+  <!-- Minha conta -->
+  <section id="vConta" class="conta" hidden>
+    <div class="acc-head">
+      <div><span class="eyebrow">Minha conta</span><h1 id="aUser"></h1></div>
+      <span id="aBadge" class="badge"></span>
+    </div>
+    <div class="stats">
+      <div class="stat"><span>Validade</span><b id="aExp"></b><small id="aDias"></small></div>
+      <div class="stat"><span>Conexões</span><b id="aLim"></b><small>ao mesmo tempo</small></div>
+      <div class="stat"><span>Tipo</span><b id="aTipo"></b><small id="aTipoS"></small></div>
+    </div>
+    <p id="aWarn" class="warn-note" hidden></p>
+
+    <div class="panel">
+      <h2>Dados de conexão</h2>
+      <dl id="aDados"></dl>
+      <p class="muted small">Sua senha é a mesma que você usou para entrar.</p>
+      <div class="btns">
+        <button id="aUuid" class="btn ghost" type="button" hidden>Gerar UUID do V2Ray</button>
+        <a id="aApp" class="btn download" target="_blank" rel="noopener" hidden>Baixar aplicativo</a>
+      </div>
+    </div>
+
+    <div id="aPlanos" class="panel" hidden>
+      <div class="sec-h"><h2 id="aPlanosT">Renovar acesso</h2><p class="muted" id="aPlanosP"></p></div>
+      <div id="planGrid" class="plans"></div>
+      <p id="planErr" class="err center" role="alert"></p>
+      <p class="secure"><svg><use href="#i-lock"/></svg> Pagamento seguro pelo Mercado Pago · você não digita dados de cartão aqui</p>
+    </div>
+    <p class="center" id="aSuporte" hidden><a id="aWa" class="btn wa soft" target="_blank" rel="noopener"><svg aria-hidden="true"><use href="#i-wa"/></svg>Falar com o suporte</a></p>
+  </section>
+
+  <!-- Pagamento da renovação -->
+  <section id="pay" class="card pay" hidden aria-live="polite">
+    <div id="payWait" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <h2>Confirmando seu pagamento…</h2>
+      <p class="muted">Pode levar alguns segundos. Não feche esta página.</p>
+      <a id="payRetry" class="btn ghost" hidden>Abrir o pagamento de novo</a>
+    </div>
+    <div id="payPix" hidden>
+      <h2>Pague com Pix</h2>
+      <p class="muted" id="pixInfo">Escaneie o QR Code no app do seu banco ou copie o código.</p>
+      <img id="pixQr" class="qr" alt="QR Code do Pix" width="220" height="220" hidden>
+      <div class="pixcode"><code id="pixCode"></code><button type="button" id="pixCopy">Copiar código Pix</button></div>
+      <p class="timer" id="pixTimer"></p>
+      <p class="muted small">Assim que o pagamento for confirmado, sua validade é atualizada aqui. Não feche esta página.</p>
+      <button type="button" id="pixNew" class="btn ghost" hidden>Voltar</button>
+    </div>
+    <div id="payOk" hidden>
+      <div class="badge-ok"><svg><use href="#i-check"/></svg></div>
+      <h2 id="okT">Pagamento aprovado!</h2>
+      <p class="muted" id="payPlano"></p>
+      <dl id="payDados"></dl>
+      <button id="payBack" class="btn primary" type="button">Voltar para minha conta</button>
+    </div>
+    <div id="payBad" hidden>
+      <h2 id="payBadT">Não conseguimos concluir</h2>
+      <p class="muted" id="payBadP"></p>
+      <button id="badBack" class="btn ghost" type="button">Voltar para minha conta</button>
+      <a id="wa3" class="btn wa" target="_blank" rel="noopener"><svg aria-hidden="true"><use href="#i-wa"/></svg>Falar no WhatsApp</a>
+    </div>
+  </section>
+</main>
+
+<footer class="foot"><div class="c foot-in"><a class="brand" href="/cliente/"><span class="logo">P</span><span>Painel</span></a><span class="muted small">Área do cliente</span></div></footer>
+<script src="/cliente/cliente.js?v=v5"></script>
+</body>
+</html>
