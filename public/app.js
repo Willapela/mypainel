@@ -658,6 +658,7 @@ function start(m) {
   $('#tabRev').hidden = !admin; $('#tabSales').hidden = !admin;
   setText('#meName', m.name || 'admin'); setText('#meRole', admin ? 'Administrador' : 'Revenda');
   setText('#meAv', String(m.name || 'A').slice(0, 1).toUpperCase());
+  setText('#meName2', m.name || 'admin'); setText('#meRole2', admin ? 'Administrador' : 'Revenda'); setText('#meAv2', String(m.name || 'A').slice(0, 1).toUpperCase());
   show(true); startPolls();
   const h = (location.hash || '').slice(1);
   setView(VIEWS[h] ? h : 'home', true);
@@ -688,7 +689,7 @@ $('#testCopy').onclick = async () => {
 };
 $('#cancel').onclick = () => $('#dlg').close();
 async function logout() { try { await api('/api/logout', 'POST'); } catch { } S.csrf = (await (await fetch('/api/me')).json()).csrf; show(false); }
-$('#logoutBtn').onclick = logout; $('#logoutTop').onclick = logout;
+$('#logoutBtn').onclick = logout; $('#logoutTop').onclick = logout; $('#logoutFoot').onclick = logout;
 $('#loginForm').onsubmit = async ev => {
   ev.preventDefault(); $('#loginErr').textContent = '';
   try { const d = await api('/api/login', 'POST', Object.fromEntries(new FormData(ev.target))); S.csrf = d.csrf; ev.target.reset(); start(d); }
