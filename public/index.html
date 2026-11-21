@@ -16,6 +16,8 @@
 <!-- Ícones (sprite) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M17.9 17.9A10.1 10.1 0 0 1 12 19c-6.4 0-10-7-10-7a18 18 0 0 1 5.1-5.9M9.9 5.2A9.7 9.7 0 0 1 12 5c6.4 0 10 7 10 7a18 18 0 0 1-2.2 3.2M14.1 14.1a3 3 0 1 1-4.2-4.2M2 2l20 20"/></symbol>
     <symbol id="i-home" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1.5"/><rect width="7" height="5" x="14" y="3" rx="1.5"/><rect width="7" height="9" x="14" y="12" rx="1.5"/><rect width="7" height="5" x="3" y="16" rx="1.5"/></symbol>
     <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
     <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
@@ -327,7 +329,7 @@
 
 <dialog id="cfDlg"><div class="dlg-card"><h2 id="cfTitle"></h2><p id="cfText" class="muted"></p><div class="row"><button type="button" class="btn" id="cfNo">Cancelar</button><button type="button" class="btn primary" id="cfYes">Confirmar</button></div></div></dialog>
 
-<dialog id="testDlg"><div class="dlg-card"><h2>Usuário de teste criado</h2><p class="muted">Guarde esses dados — a senha não será mostrada de novo.</p><div class="cred-box"><div><span>Usuário</span><code id="testUser"></code></div><div><span>Senha</span><code id="testPass"></code></div><div><span>Expira</span><code id="testExp"></code></div></div><label class="field">Texto completo<textarea id="testCopyArea" readonly rows="5"></textarea></label><div class="row"><button type="button" class="btn" id="testCopy"><svg class="ic"><use href="#i-copy"/></svg> Copiar tudo</button><button type="button" class="btn primary" id="testOk">Ok</button></div></div></dialog>
+<dialog id="testDlg"><div class="dlg-card"><h2 id="credTitle">Usuário criado</h2><p class="muted" id="credSub"></p><div class="cred-box" id="credBox"></div><label class="field">Texto completo<textarea id="testCopyArea" readonly rows="5"></textarea></label><div class="row wrap"><button type="button" class="btn" id="credNew" hidden>Gerar novo UUID</button><button type="button" class="btn" id="testCopy"><svg class="ic"><use href="#i-copy"/></svg> Copiar tudo</button><button type="button" class="btn primary" id="testOk">Ok</button></div></div></dialog>
 
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/app.js?v=v4"></script>

@@ -23,6 +23,14 @@ const VIEWS = {
 
 /* ---------- helpers de DOM ---------- */
 const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+// campo de senha com olhinho: mostra/esconde o que foi digitado, para conferir e corrigir
+function pwEye(input, visible) {
+  if (input.parentElement && input.parentElement.classList.contains('pw')) return input.parentElement;
+  const w = el('div', 'pw'), b = el('button', 'eye'); b.type = 'button';
+  const set = on => { input.type = on ? 'text' : 'password'; b.replaceChildren(icon(on ? 'eyeoff' : 'eye')); b.setAttribute('aria-label', on ? 'Esconder senha' : 'Mostrar senha'); b.title = on ? 'Esconder senha' : 'Mostrar senha'; b.setAttribute('aria-pressed', on ? 'true' : 'false'); };
+  b.onclick = () => { set(input.type === 'password'); input.focus(); };
+  if (input.parentNode) input.replaceWith(w); w.append(input, b); set(!!visible); return w;
+}
 function icon(name, cls) {
   const s = document.createElementNS(NS, 'svg'); s.setAttribute('class', 'ic' + (cls ? ' ' + cls : ''));
   const u = document.createElementNS(NS, 'use'); u.setAttribute('href', '#i-' + name); s.append(u); return s;
@@ -153,7 +161,7 @@ function openDialog(title, fields, save) {
       if (f.placeholder) i.placeholder = f.placeholder;
       if (f.value != null) i.value = f.value;
     }
-    l.append(i); return l;
+    l.append(f.type === 'password' ? pwEye(i, f.reveal) : i); return l;
   }));
   $('#form').onsubmit = async ev => {
     ev.preventDefault();
@@ -327,7 +335,7 @@ function counts() {
   return c;
 }
 async function loadUsers() {
-  const d = await api('/api/users'); S.users = d.rows || [];
+  const d = await api('/api/users'); S.users = d.rows || []; S.xray = !!d.xray;
   renderAll();
 }
 function renderKpis() {
@@ -371,6 +379,7 @@ function userMenu(r) {
   const items = [
     { icon: 'edit', label: 'Editar usuário', fn: () => editUser(r) },
     { icon: 'calplus', label: 'Renovar +30 dias', fn: () => renew(r) },
+    ...(S.xray ? [{ icon: 'shield', label: r.uuid ? 'UUID do V2Ray' : 'Gerar UUID do V2Ray', fn: () => showUuid(r) }] : []),
     '-',
     r.blocked ? { icon: 'play', label: 'Desbloquear', fn: () => unblockUser(r) } : { icon: 'pause', label: 'Bloquear acesso', fn: () => blockUser(r) },
     { icon: 'gauge', label: r.mbps ? 'Alterar limite (' + r.mbps + ' Mbps)' : 'Limitar tráfego', fn: () => throttleUser(r) }
@@ -392,6 +401,7 @@ function renderUsers() {
     const c2 = el('td'); c2.dataset.l = 'Situação'; const pills = el('div', 'pills');
     pills.append(el('span', 'pill ' + (r.blocked ? 'bad' : st.c), r.blocked ? 'Bloqueado' : st.t));
     if (r.mbps && !r.blocked) pills.append(el('span', 'pill warn plain', r.mbps + ' Mbps'));
+    if (r.uuid && !r.blocked) pills.append(el('span', 'pill off plain', 'V2Ray'));
     c2.append(pills);
 
     const c3 = el('td'); c3.dataset.l = 'Expira em'; const dt = el('div', 'dt ' + (r.blocked ? '' : st.c));
@@ -420,13 +430,39 @@ function setFilter(f) {
   if (S.view === 'users') renderUsers();
 }
 
+/* ---------- janela de dados de acesso (usuário / teste / UUID) ---------- */
+const xrayRows = d => d && d.uuid ? [['UUID', d.uuid], ...(d.link ? [['Link V2Ray', d.link]] : [])] : [];
+function showCred({ title, sub, rows, rotate }) {
+  $('#credTitle').textContent = title; $('#credSub').textContent = sub || '';
+  $('#credBox').replaceChildren(...rows.map(([l, v]) => { const d = el('div'); d.append(el('span', '', l), el('code', '', String(v))); return d; }));
+  const full = rows.map(([l, v]) => l + ': ' + v).join('\n');
+  $('#testDlg').dataset.copy = full; $('#testCopyArea').value = full;
+  const nb = $('#credNew'); nb.hidden = !rotate; nb.onclick = rotate || null;
+  setTimeout(() => $('#testDlg').showModal(), 0);
+}
+async function createUser(b) {
+  const d = await api('/api/users', 'POST', b);
+  showCred({ title: 'Usuário criado', sub: 'Guarde esses dados — a senha não será mostrada de novo.',
+    rows: [['Usuário', b.usuario], ['Senha', b.senha], ['Expira', b.expira ? fmtDateBR(b.expira) : 'Nunca'], ['Limite', parseInt(b.limite, 10) || 1], ...xrayRows(d)] });
+  return 'silent';
+}
+async function showUuid(r, novo) {
+  try {
+    let d = r;
+    if (!r.uuid || novo) { d = await api('/api/users/' + encodeURIComponent(r.usuario) + '/uuid', 'POST', { novo: !!novo }); loadUsers(); }
+    showCred({ title: 'UUID do V2Ray', sub: r.usuario + ' · VLESS', rows: [['Usuário', r.usuario], ...xrayRows(d)],
+      rotate: async () => { if (await ask('Gerar novo UUID?', 'O UUID antigo para de funcionar e o cliente precisa atualizar no aplicativo.', 'Gerar novo')) { $('#testDlg').close(); showUuid(r, true); } } });
+  } catch (e) { toast(e.message); }
+}
+
 function editUser(r) {
   const f = [
-    { name: 'senha', type: 'password', label: r ? 'Nova senha (deixe vazio para manter)' : 'Senha' },
+    { name: 'senha', type: 'password', reveal: !r, label: r ? 'Nova senha (deixe vazio para manter)' : 'Senha' },
     { name: 'expira', type: 'date', label: 'Expira em (vazio = nunca)', value: r ? r.expira : '' },
     { name: 'limite', type: 'number', min: 1, label: 'Limite de conexões', value: r ? r.limite : 1 }];
   if (!r) f.unshift({ name: 'usuario', label: 'Usuário', placeholder: 'ex: joao123' });
-  openDialog(r ? 'Editar ' + r.usuario : 'Novo usuário', f, b => api(r ? '/api/users/' + encodeURIComponent(r.usuario) : '/api/users', r ? 'PUT' : 'POST', b));
+  if (!r && S.xray) f.push({ name: 'xray', type: 'select', label: 'Vincular ao V2Ray (Xray)? Gera UUID e link', value: 's', options: [{ value: 's', label: 'Sim — gerar UUID e link' }, { value: 'n', label: 'Não' }] });
+  openDialog(r ? 'Editar ' + r.usuario : 'Novo usuário', f, b => r ? api('/api/users/' + encodeURIComponent(r.usuario), 'PUT', b) : createUser(b));
 }
 async function delUser(r) {
   if (!await ask('Excluir ' + r.usuario + '?', 'A conta do Linux será apagada e as conexões derrubadas. Isso não pode ser desfeito.', 'Excluir', true)) return;
@@ -481,11 +517,9 @@ function openTestDialog() {
     const dias = parseInt(b.dias, 10), limite = parseInt(b.limite, 10) || 1;
     const usuario = 'test_' + randStr(6), senha = randStr(10, 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789');
     const expira = dias > 0 ? addDays(null, dias) : '';
-    await api('/api/users', 'POST', { usuario, senha, expira, limite });
-    setText('#testUser', usuario); setText('#testPass', senha); setText('#testExp', fmtDateBR(expira));
-    const full = ['Usuário: ' + usuario, 'Senha: ' + senha, 'Expira: ' + fmtDateBR(expira), 'Limite: ' + limite].join('\n');
-    $('#testDlg').dataset.copy = full; $('#testCopyArea').value = full;
-    setTimeout(() => $('#testDlg').showModal(), 0);
+    const d = await api('/api/users', 'POST', { usuario, senha, expira, limite });
+    showCred({ title: 'Usuário de teste criado', sub: 'Guarde esses dados — a senha não será mostrada de novo.',
+      rows: [['Usuário', usuario], ['Senha', senha], ['Expira', expira ? fmtDateBR(expira) : 'Nunca'], ['Limite', limite], ...xrayRows(d)] });
     return 'silent';
   });
 }
@@ -662,6 +696,7 @@ $('#loginForm').onsubmit = async ev => {
 };
 window.addEventListener('hashchange', () => { if ($('#app').hidden) return; const h = (location.hash || '').slice(1); if (VIEWS[h] && h !== S.view) setView(h, true); });
 
+document.querySelectorAll('input[type=password]').forEach(i => pwEye(i));
 (async () => {
   const m = await (await fetch('/api/me')).json();
   S.csrf = m.csrf;
