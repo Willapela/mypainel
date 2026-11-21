@@ -169,6 +169,11 @@ async function recupera(id) {
     document.head.append(s);
   }
   $('#gerar').onclick = gerar;
+  const nav = $('.nav'), bg = $('#burger');
+  const menu = open => { nav.classList.toggle('open', open); bg.setAttribute('aria-expanded', open); bg.setAttribute('aria-label', open ? 'Fechar menu' : 'Abrir menu'); bg.firstElementChild.firstElementChild.setAttribute('href', open ? '#i-close' : '#i-menu'); };
+  bg.onclick = () => menu(!nav.classList.contains('open'));
+  document.querySelectorAll('.nav-links a').forEach(a => a.addEventListener('click', () => menu(false)));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') menu(false); });
   const rv = [...document.querySelectorAll('.rv')];
   if ('IntersectionObserver' in window) { const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .12, rootMargin: '0px 0px -40px 0px' }); rv.forEach(x => io.observe(x)); }
   else rv.forEach(x => x.classList.add('in'));

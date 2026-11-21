@@ -40,6 +40,8 @@ main,.nav,.foot{position:relative;z-index:1}
 .nav-links a{padding:8px 13px;border-radius:10px;color:var(--ink2);font-size:14.5px;font-weight:600;text-decoration:none;transition:background .15s,color .15s}
 .nav-links a:hover{background:rgba(167,139,250,.12);color:var(--ink)}
 .nav .btn{width:auto}
+.burger{display:none;place-items:center;width:42px;height:42px;border-radius:12px;border:1px solid var(--line2);background:var(--panel2);color:var(--ink);cursor:pointer;padding:0}
+.burger svg{width:22px;height:22px}
 
 /* botões */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;width:100%;min-height:48px;padding:0 20px;border:1px solid var(--line2);border-radius:13px;background:var(--panel2);color:var(--ink);font:inherit;font-weight:700;text-decoration:none;cursor:pointer;transition:transform .12s,filter .15s,box-shadow .15s,background .15s}
@@ -210,9 +212,12 @@ dl{margin:4px 0;display:grid;gap:8px}
 .js .rv.in{opacity:1;transform:none}
 
 @media(max-width:900px){
+  .burger{display:grid}
+  .nav-links{display:none;position:absolute;top:64px;left:0;right:0;flex-direction:column;gap:2px;margin:0;padding:10px 18px 16px;background:rgba(10,7,22,.98);border-bottom:1px solid var(--line);box-shadow:0 20px 40px rgba(0,0,0,.5)}
+  .nav.open .nav-links{display:flex}
+  .nav-links a{padding:14px 12px;font-size:16px}
   .hero{grid-template-columns:1fr;gap:34px;padding:40px 0 36px}
   .mock{min-height:400px}
-  .nav-links{display:none}
   .nav .btn{margin-left:auto}
   .steps,.feats{grid-template-columns:1fr}
   .steps .step::after{display:none}
