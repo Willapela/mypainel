@@ -268,3 +268,9 @@ input:focus{outline:2px solid var(--v2);outline-offset:1px;background:rgba(255,2
 .main,.conta,.conta>*,.panel,.panel>*,dl,.row,.row dd{min-width:0}
 .row dd{overflow-wrap:anywhere}
 .panel .plans{margin-inline:0;width:100%;max-width:none}
+
+.pw{position:relative;display:block}
+.pw input{padding-right:50px}
+.eye{position:absolute;right:5px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;border-radius:10px;background:transparent;color:var(--mut);display:grid;place-items:center;cursor:pointer;padding:0;min-height:0}
+.eye:hover{color:var(--ink);background:rgba(167,139,250,.12)}
+.eye svg{width:20px;height:20px}

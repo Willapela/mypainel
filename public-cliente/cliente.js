@@ -180,10 +180,20 @@ function acompanha(id) {
   poll = setInterval(() => { if (Date.now() - t0 > 30 * 60e3) { clearInterval(poll); return; } checa(id, false); }, 3000);
 }
 
+/* olhinho: mostra/esconde a senha digitada, para conferir e corrigir */
+function pwEye(input) {
+  const w = document.createElement('div'), b = document.createElement('button');
+  w.className = 'pw'; b.type = 'button'; b.className = 'eye';
+  const set = on => { input.type = on ? 'text' : 'password'; b.replaceChildren(icon(on ? 'eyeoff' : 'eye')); b.title = b.ariaLabel = on ? 'Esconder senha' : 'Mostrar senha'; };
+  b.onclick = () => { set(input.type === 'password'); input.focus(); };
+  input.replaceWith(w); w.append(input, b); set(false);
+}
+
 /* ---------- início ---------- */
 (async () => {
   try { cfg = await (await fetch('/api/cliente/config')).json(); } catch { }
   $('#lhelp').hidden = !cfg.teste;
+  pwEye($('#lp'));
   $('#fLogin').addEventListener('submit', entrar);
   $('#sair').onclick = () => sair(false);
   $('#aUuid').onclick = gerarUuid;
