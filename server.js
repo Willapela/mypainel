@@ -918,7 +918,27 @@ async function mp(method, p, body, extra) {
 }
 
 // Cria a conta paga (só chamada com pagamento aprovado e valor conferido)
+// Renovação: soma os dias da compra à validade atual da conta (ou a partir de hoje, se já venceu)
+async function renovaConta(o, pay) {
+  const u = o.renovacao, su = sysUsers().find(x => x.usuario === u);
+  if (!su) throw new Error('usuário da renovação não existe mais: ' + u);
+  const hoje = new Date().toISOString().slice(0, 10), meta = userMeta(u);
+  const atual = meta.blocked ? (meta.prevExpira || '') : (su.expira || '');
+  const base = atual && atual > hoje ? Date.parse(atual + 'T00:00:00Z') : Date.now();
+  const dia = new Date(base + o.plano.dias * DIA).toISOString().slice(0, 10);
+  if (meta.blocked) { meta.prevExpira = dia; meta.prevLimite = o.plano.limite; }   // bloqueada pelo admin: vale quando desbloquear
+  else {
+    await setExpiry(u, dia);
+    const m = readLimits(); m.set(u, o.plano.limite); writeLimits(m);
+    dcUpsertUser({ usuario: u, limite: o.plano.limite, expira: dia }).catch(e => console.warn('[DragonCore]', e.message));
+  }
+  S.tst = S.tst.filter(t => t.u !== u);   // conta de teste que renova deixa de ser apagada
+  Object.assign(o, { status: 'pago', pagoEm: Date.now(), pagamento: String(pay.id), usuario: u, expira: dia });
+  save(); xrayEnsure(u); xrayKick(1500);
+  console.log('[MP] pedido ' + o.id + ' pago · renovação ' + o.plano.nome + ' · usuário ' + u + ' até ' + dia);
+}
 async function entregaPedido(o, pay) {
+  if (o.renovacao) return renovaConta(o, pay);
   const passwd = () => fs.readFileSync('/etc/passwd', 'utf8').split('\n').map(l => l.split(':')[0]);
   let usuario = '';
   for (let i = 0; i < 5 && !usuario; i++) { const u = 'cli' + crypto.randomBytes(3).toString('hex'); if (!passwd().includes(u)) usuario = u; }
@@ -973,39 +993,43 @@ function assinaturaOk(req, pid) {
   return eq(crypto.createHmac('sha256', SALE.secret).update(manifest).digest('hex'), v1);
 }
 
-if (SALE.on) {
-  app.post('/api/pedidos', rateLimit({
-    windowMs: 60e3, max: 6, standardHeaders: true, legacyHeaders: false, message: { error: 'Muitas tentativas. Aguarde um minuto.' }
-  }), run(async req => {
-    const plano = SALE.planos.find(p => p.id === String((req.body || {}).plano || ''));
+// Cria o pedido (compra nova ou renovação) e devolve Pix ou link de pagamento
+async function criaPedido(body, extra = {}) {
+    const plano = SALE.planos.find(p => p.id === String(body.plano || ''));
     if (!plano) throw fail('Plano inválido.');
     if (S.pedidos.filter(o => o.status === 'pendente').length > 500) throw fail('Muitos pedidos em aberto. Tente mais tarde.');
-    const id = crypto.randomBytes(12).toString('hex'), volta = SALE.url + '/teste?pedido=' + id;
-    if (String((req.body || {}).metodo) === 'pix') {
+    const id = crypto.randomBytes(12).toString('hex'), volta = SALE.url + (extra.renovacao ? '/cliente/' : '/teste') + '?pedido=' + id;
+    if (String(body.metodo) === 'pix') {
       // Pix direto na página: QR Code + "copia e cola" (Mercado Pago /v1/payments)
       const ate = Date.now() + 30 * 60e3, exp = new Date(ate - 3 * 3600e3).toISOString().replace('Z', '-03:00');
       const pay = await mp('POST', '/v1/payments', {
-        transaction_amount: plano.preco, description: ('Acesso ' + plano.nome + ' · ' + plano.dias + ' dias').slice(0, 250), payment_method_id: 'pix',
+        transaction_amount: plano.preco, description: ((extra.renovacao ? 'Renovação ' : 'Acesso ') + plano.nome + ' · ' + plano.dias + ' dias').slice(0, 250), payment_method_id: 'pix',
         payer: { email: 'pedido-' + id.slice(0, 10) + '@' + (new URL(SALE.url).hostname.includes('.') ? new URL(SALE.url).hostname : 'example.com') },
         external_reference: id, notification_url: SALE.url + '/api/mp/webhook', date_of_expiration: exp
       }, { 'X-Idempotency-Key': id });
       const td = (pay.point_of_interaction && pay.point_of_interaction.transaction_data) || {};
       if (!td.qr_code) throw new Error('MercadoPago não devolveu o código Pix');
-      S.pedidos.push({ id, plano: { nome: plano.nome, dias: plano.dias, preco: plano.preco, limite: plano.limite }, status: 'pendente', criado: Date.now(), metodo: 'pix', pixId: String(pay.id), pix: { codigo: td.qr_code, qr: td.qr_code_base64 || '', ate } });
+      S.pedidos.push({ id, plano: { nome: plano.nome, dias: plano.dias, preco: plano.preco, limite: plano.limite }, status: 'pendente', criado: Date.now(), ...extra, metodo: 'pix', pixId: String(pay.id), pix: { codigo: td.qr_code, qr: td.qr_code_base64 || '', ate } });
       save();
       return { id, pix: { codigo: td.qr_code, qr: td.qr_code_base64 || '', ate } };
     }
     const r = await mp('POST', '/checkout/preferences', {
-      items: [{ id: plano.id, title: ('Acesso ' + plano.nome + ' · ' + plano.dias + ' dias').slice(0, 250), quantity: 1, unit_price: plano.preco, currency_id: 'BRL' }],
+      items: [{ id: plano.id, title: ((extra.renovacao ? 'Renovação ' : 'Acesso ') + plano.nome + ' · ' + plano.dias + ' dias').slice(0, 250), quantity: 1, unit_price: plano.preco, currency_id: 'BRL' }],
       external_reference: id, notification_url: SALE.url + '/api/mp/webhook',
       back_urls: { success: volta, pending: volta, failure: volta }, auto_return: 'approved'
     });
     const url = r.init_point;
     if (!url) throw new Error('MercadoPago não devolveu o link de pagamento');
-    S.pedidos.push({ id, plano: { nome: plano.nome, dias: plano.dias, preco: plano.preco, limite: plano.limite }, status: 'pendente', criado: Date.now(), pref: r.id, url });
+    S.pedidos.push({ id, plano: { nome: plano.nome, dias: plano.dias, preco: plano.preco, limite: plano.limite }, status: 'pendente', criado: Date.now(), ...extra, pref: r.id, url });
     save();
     return { id, url };
-  }));
+}
+
+if (SALE.on) {
+  app.post('/api/pedidos', rateLimit({
+    windowMs: 60e3, max: 6, standardHeaders: true, legacyHeaders: false, message: { error: 'Muitas tentativas. Aguarde um minuto.' }
+  }), run(async req => criaPedido(req.body || {})));
+
 
   app.get('/api/pedidos/:id', rateLimit({
     windowMs: 60e3, max: 40, standardHeaders: true, legacyHeaders: false, message: { error: 'Muitas consultas. Aguarde um instante.' }
@@ -1015,7 +1039,7 @@ if (SALE.on) {
     if (o.status === 'pendente' && Date.now() - (o.ck || 0) > 8000) { o.ck = Date.now(); await reconcilia(o).catch(e => console.warn('[MP] consulta:', e.message)); }
     const out = { status: o.status, plano: o.plano.nome, dias: o.plano.dias };
     if (o.status === 'pendente') { if (o.pix) { out.pix = o.pix; out.expirado = Date.now() > o.pix.ate + 60e3; } else out.url = o.url; }
-    if (o.status === 'pago') { out.usuario = o.usuario; out.expira = o.expira; out.limite = o.plano.limite; if (o.senha) out.senha = o.senha; Object.assign(out, xrayInfo(o.usuario)); }
+    if (o.status === 'pago') { if (o.renovacao) out.renovacao = true; out.usuario = o.usuario; out.expira = o.expira; out.limite = o.plano.limite; if (o.senha) out.senha = o.senha; Object.assign(out, xrayInfo(o.usuario)); }
     return out;
   }));
 
@@ -1042,10 +1066,79 @@ if (SALE.on) {
   console.warn('[MP] vendas desativadas: confira MP_ACCESS_TOKEN, PUBLIC_URL e PLANOS no .env');
 }
 
+// ===== Área do cliente: /cliente (entra com o usuário e a senha do próprio acesso) =====
+const CLI = { on: process.env.CLIENTE_AREA !== '0', sess: new Map(), falhas: new Map() };
+if (CLI.on) {
+  app.use('/cliente', (req, res, next) => {
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'");
+    next();
+  });
+  app.use('/cliente', express.static(path.join(__dirname, 'public-cliente')));
+  app.get(['/cliente', '/cliente/'], (req, res) => res.sendFile(path.join(__dirname, 'public-cliente', 'index.html')));
+
+  const hashDe = u => { const l = fs.readFileSync('/etc/shadow', 'utf8').split('\n').find(x => x.startsWith(u + ':')); return l ? l.split(':')[1].replace(/^!+/, '') : ''; };
+  // confere a senha com o próprio crypt do sistema (perl usa a libcrypt: sha512, yescrypt…); a senha vai por stdin, nunca na linha de comando
+  async function senhaConfere(u, senha) {
+    const real = /^[a-z_][a-z0-9_.-]{0,39}$/i.test(u) && sysUsers().some(x => x.usuario === u) ? hashDe(u) : '';
+    const h = real || '$6$painel$invalido';
+    if (h[0] !== '$') return false;
+    try { const out = await sys('perl', ['-e', 'my $p=<STDIN>; chomp $p; print crypt($p,$ARGV[0]);', h], senha + '\n', 8000); return !!real && eq(out, h); } catch { return false; }
+  }
+  const cli = (req, res, next) => {
+    const t = String(req.get('x-cliente') || ''), x = CLI.sess.get(t);
+    if (!x || x.exp < Date.now()) { CLI.sess.delete(t); return res.status(401).json({ error: 'Sessão expirada. Entre de novo.' }); }
+    req.cu = x.u; next();
+  };
+  const lim = (max, ms = 60e3, msg = 'Muitas tentativas. Aguarde um instante.') => rateLimit({ windowMs: ms, max, standardHeaders: true, legacyHeaders: false, message: { error: msg } });
+
+  app.get('/api/cliente/config', (req, res) => res.json({ whatsapp: T.wa, msg: T.msg, appUrl: T.appUrl || null, appLabel: T.appLabel || 'Baixar aplicativo', teste: T.on }));
+
+  app.post('/api/cliente/login', lim(12, 10 * 60e3, 'Muitas tentativas. Aguarde alguns minutos.'), run(async req => {
+    const u = String((req.body || {}).usuario || '').trim().slice(0, 40), p = String((req.body || {}).senha || '');
+    if (!u || !p || p.length > 64 || /[\r\n\0]/.test(p)) throw fail('Usuário ou senha incorretos.');
+    const f = CLI.falhas.get(u) || { n: 0, t: 0 };
+    if (f.n >= 6 && Date.now() - f.t < 15 * 60e3) throw fail('Muitas tentativas para esse usuário. Aguarde 15 minutos.');
+    if (!(await senhaConfere(u, p))) {
+      if (Date.now() - f.t > 15 * 60e3) f.n = 0;
+      f.n++; f.t = Date.now(); CLI.falhas.set(u, f); if (CLI.falhas.size > 5000) CLI.falhas.clear();
+      throw fail('Usuário ou senha incorretos.');
+    }
+    CLI.falhas.delete(u);
+    const token = crypto.randomBytes(24).toString('hex'); CLI.sess.set(token, { u, exp: Date.now() + 2 * 3600e3 });
+    return { token };
+  }));
+  app.post('/api/cliente/logout', (req, res) => { CLI.sess.delete(String(req.get('x-cliente') || '')); res.json({ ok: true }); });
+
+  app.get('/api/cliente/me', lim(60), cli, run(async req => {
+    const u = req.cu, su = sysUsers().find(x => x.usuario === u);
+    if (!su) throw fail('Conta não encontrada.');
+    const meta = S.meta[u] || {}, hoje = new Date().toISOString().slice(0, 10);
+    const expira = meta.blocked ? (meta.prevExpira || null) : su.expira;
+    const status = meta.blocked ? 'bloqueado' : (expira && expira < hoje ? 'vencido' : 'ativo');
+    const dias = expira ? Math.round((Date.parse(expira + 'T00:00:00Z') - Date.parse(hoje + 'T00:00:00Z')) / DIA) : null;
+    return {
+      usuario: u, expira, dias, status, limite: meta.blocked ? (meta.prevLimite || 1) : (readLimits().get(u) || 1),
+      teste: S.tst.some(t => t.u === u), xray: XR.on, ...xrayInfo(u), host: T.host || '', porta: T.sshPort,
+      vendas: SALE.on, planos: SALE.on ? SALE.planos.map(({ id, nome, dias, preco, limite, destaque }) => ({ id, nome, dias, preco, limite, destaque })) : []
+    };
+  }));
+  app.post('/api/cliente/uuid', lim(10), cli, run(async req => {
+    if (!XR.on) throw fail('V2Ray não está ativo neste servidor.');
+    xrayEnsure(req.cu); return xrayInfo(req.cu);
+  }));
+  app.post('/api/cliente/renovar', lim(6), cli, run(async req => {
+    if (!SALE.on) throw fail('Renovação online indisponível no momento. Fale com o suporte.');
+    if ((S.meta[req.cu] || {}).blocked) throw fail('Conta bloqueada. Fale com o suporte.');
+    return criaPedido(req.body || {}, { renovacao: req.cu });
+  }));
+  setInterval(() => { const n = Date.now(); for (const [k, v] of CLI.sess) if (v.exp < n) CLI.sess.delete(k); }, 10 * 60e3).unref();
+  console.log('Área do cliente em /cliente');
+}
+
 // Lista de vendas para o painel (somente admin)
 app.get('/api/vendas', auth, adminOnly, (req, res) => {
   const now = Date.now(), rows = S.pedidos.slice().sort((a, b) => b.criado - a.criado).slice(0, 300).map(o => ({
-    id: o.id, plano: o.plano.nome, dias: o.plano.dias, preco: o.plano.preco, status: o.status, criado: o.criado, pagoEm: o.pagoEm || null, usuario: o.usuario || null
+    id: o.id, plano: o.plano.nome + (o.renovacao ? ' · renovação' : ''), dias: o.plano.dias, preco: o.plano.preco, status: o.status, criado: o.criado, pagoEm: o.pagoEm || null, usuario: o.usuario || null
   }));
   const pagos = S.pedidos.filter(o => o.status === 'pago'), mes = pagos.filter(o => o.pagoEm > now - 30 * DIA);
   res.json({
