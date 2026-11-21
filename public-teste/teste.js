@@ -1,4 +1,5 @@
 const $ = s => document.querySelector(s);
+document.documentElement.classList.add('js');
 const NS = 'http://www.w3.org/2000/svg';
 let cfg = {}, token = '', timer, poll;
 const brl = v => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -12,7 +13,9 @@ const wa = extra => cfg.whatsapp ? 'https://wa.me/' + cfg.whatsapp + '?text=' + 
 function icon(name) { const s = document.createElementNS(NS, 'svg'), u = document.createElementNS(NS, 'use'); u.setAttribute('href', '#i-' + name); s.append(u); return s; }
 
 function setLinks() {
-  const wa2 = $('#wa2'); wa2.hidden = !cfg.whatsapp; if (cfg.whatsapp) wa2.href = wa('');
+  document.querySelectorAll('[data-wa]').forEach(a => { a.hidden = !cfg.whatsapp; if (cfg.whatsapp) a.href = wa(''); });
+  document.querySelectorAll('[data-needs="wa"]').forEach(x => { x.hidden = !cfg.whatsapp; });
+  document.querySelectorAll('[data-horas]').forEach(x => { if (cfg.horas) x.textContent = cfg.horas + (cfg.horas == 1 ? ' hora' : ' horas'); });
   const url = cfg.appUrl || '', label = cfg.appLabel || 'Baixar aplicativo';
   ['#appDl2', '#appDl3'].forEach(sel => { const a = $(sel); if (!a) return; if (url) { a.href = url; a.textContent = label; a.hidden = false; } else a.hidden = true; });
 }
@@ -46,7 +49,7 @@ async function gerar() {
     if (!r.ok) throw new Error(d.error || 'Não foi possível gerar o teste agora.');
     const box = $('#dados'); box.replaceChildren(row('Usuário', d.usuario), row('Senha', d.senha)); if (d.uuid) box.append(row('UUID', d.uuid)); if (d.link) box.append(row('Link', d.link));
     countdown(d.ate);
-    if (cfg.appUrl) { $('#appDl').href = cfg.appUrl; $('#appDl').textContent = cfg.appLabel || 'Baixar aplicativo'; $('#appDl').hidden = false; $('#appDl2').hidden = true; }
+    if (cfg.appUrl) { $('#appDl').href = cfg.appUrl; $('#appDl').textContent = cfg.appLabel || 'Baixar aplicativo'; $('#appDl').hidden = false; }
     $('#pre').hidden = true; $('#res').hidden = false;
     if ($('#planos').childElementCount) $('#planos').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } catch (e) {
@@ -58,7 +61,10 @@ async function gerar() {
 /* ---------- planos / compra ---------- */
 function renderPlans() {
   const list = cfg.planos || [], grid = $('#planGrid');
-  $('#planos').hidden = !list.length; if (!list.length) return;
+  $('#planos').hidden = !list.length;
+  document.querySelectorAll('[data-needs="plans"]').forEach(x => { x.hidden = !list.length; });
+  if (!list.length) return;
+  const min = Math.min(...list.map(p => p.preco / p.dias)); $('#fromTxt').textContent = 'Planos a partir de ' + brl(min) + ' por dia'; $('#fromChip').hidden = false;
   grid.replaceChildren(...list.map(p => {
     const c = document.createElement('article'); c.className = 'plan' + (p.destaque ? ' hot' : '');
     if (p.destaque) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'Mais escolhido'; c.append(t); }
@@ -95,7 +101,7 @@ function showPay(state) {
   $('#pay').hidden = false;
   ['Wait', 'Pix', 'Ok', 'Bad'].forEach(k => { $('#pay' + k).hidden = k !== state; });
   const focus = state === 'Wait' || state === 'Pix' || state === 'Ok';
-  $('#trial').hidden = focus; $('#planos').hidden = focus || !(cfg.planos || []).length;
+  const was = $('#landing').hidden; $('#landing').hidden = focus; if (focus && !was) window.scrollTo({ top: 0 });
 }
 let pixTimer = null, pixCode = '';
 function renderPix(pix, label) {
@@ -104,7 +110,7 @@ function renderPix(pix, label) {
   const img = $('#pixQr'); if (pix.qr) { img.src = 'data:image/png;base64,' + pix.qr; img.hidden = false; } else img.hidden = true;
   $('#pixCode').textContent = pix.codigo; pixCode = pix.codigo; $('#pixNew').hidden = true; $('#pixCopy').hidden = false;
   $('#pixCopy').onclick = async () => { const b = $('#pixCopy'); try { await navigator.clipboard.writeText(pixCode); b.textContent = 'Código copiado!'; } catch { b.textContent = 'Selecione e copie o código'; } setTimeout(() => b.textContent = 'Copiar código Pix', 2000); };
-  $('#pixNew').onclick = () => { store.set(''); clearInterval(poll); clearInterval(pixTimer); $('#pay').hidden = true; $('#trial').hidden = false; renderPlans(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  $('#pixNew').onclick = () => { store.set(''); clearInterval(poll); clearInterval(pixTimer); $('#pay').hidden = true; $('#landing').hidden = false; renderPlans(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const tick = () => {
     const s = Math.max(0, Math.round((pix.ate - Date.now()) / 1000));
     if (!s) { clearInterval(pixTimer); $('#pixTimer').textContent = 'Esse Pix expirou. Se você já pagou, aguarde alguns segundos; senão, gere um novo.'; img.hidden = true; $('#pixCopy').hidden = true; $('#pixNew').hidden = false; return; }
@@ -163,6 +169,9 @@ async function recupera(id) {
     document.head.append(s);
   }
   $('#gerar').onclick = gerar;
+  const rv = [...document.querySelectorAll('.rv')];
+  if ('IntersectionObserver' in window) { const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .12, rootMargin: '0px 0px -40px 0px' }); rv.forEach(x => io.observe(x)); }
+  else rv.forEach(x => x.classList.add('in'));
   const OK = v => /^[0-9a-f]{24}$/.test(v), fromUrl = new URLSearchParams(location.search).get('pedido') || '';
   if (OK(fromUrl)) { store.set(fromUrl); acompanha(fromUrl); }
   else if (OK(store.get())) recupera(store.get());   // pagou e fechou a aba: recupera o acesso (até 24h)
