@@ -64,10 +64,18 @@ async function carrega() {
 function renderConta() {
   const m = me;
   $('#aUser').textContent = m.usuario;
+  $('#aAv').textContent = String(m.usuario || 'A').slice(0, 1).toUpperCase();
   const st = { ativo: ['ok', 'Ativo'], vencido: ['bad', 'Vencido'], bloqueado: ['bad', 'Bloqueado'] }[m.status] || ['warn', m.status];
   const bd = $('#aBadge'); bd.className = 'badge ' + (m.status === 'ativo' && m.dias != null && m.dias <= 3 ? 'warn' : st[0]); bd.textContent = m.status === 'ativo' && m.dias != null && m.dias <= 3 ? 'Vence em breve' : st[1];
   $('#aExp').textContent = fmtDate(m.expira);
   $('#aDias').textContent = m.dias == null ? 'sem vencimento' : m.status === 'vencido' ? 'venceu há ' + Math.abs(m.dias) + (Math.abs(m.dias) === 1 ? ' dia' : ' dias') : m.dias === 0 ? 'vence hoje' : m.dias === 1 ? 'resta 1 dia' : 'restam ' + m.dias + ' dias';
+  { // anel de validade: cheio com 30 dias ou mais
+    const rg = $('#ring'), venc = m.status === 'vencido' || (m.dias != null && m.dias < 0), frac = m.dias == null ? 1 : venc ? 0 : Math.min(m.dias, 30) / 30;
+    rg.className = 'ring' + (venc || m.status === 'bloqueado' ? ' bad' : (m.dias != null && m.dias <= 3 ? ' warn' : ''));
+    $('#ringNum').textContent = m.dias == null ? '∞' : venc ? '0' : m.dias;
+    $('#ringLbl').textContent = m.dias == null ? 'sem vencimento' : venc ? 'vencido' : m.dias === 1 ? 'dia restante' : 'dias restantes';
+    const arc = $('#ringArc'); arc.style.strokeDashoffset = 477.5; requestAnimationFrame(() => requestAnimationFrame(() => { arc.style.strokeDashoffset = 477.5 * (1 - frac); }));
+  }
   $('#aLim').textContent = m.limite;
   $('#aTipo').textContent = m.teste ? 'Teste' : 'Plano'; $('#aTipoS').textContent = m.teste ? 'acesso de teste grátis' : 'acesso contratado';
 
@@ -91,6 +99,7 @@ function renderConta() {
     $('#aPlanosP').textContent = m.teste ? 'Escolha o plano e continue com o mesmo usuário e senha.' : 'Os dias do plano são somados à sua validade atual — não perde nada.';
     renderPlans(m);
   }
+  pushRender();
   const sup = $('#aSuporte'); sup.hidden = !cfg.whatsapp; if (cfg.whatsapp) $('#aWa').href = wa('');
 }
 
@@ -102,12 +111,19 @@ async function gerarUuid() {
 }
 
 /* ---------- planos / renovação ---------- */
+
+function ticket(c, h, pr, per, ul, btns, hint) {
+  const top = document.createElement('div'); top.className = 'plan-top'; top.append(h, pr, per);
+  const perf = document.createElement('div'); perf.className = 'perf';
+  const bot = document.createElement('div'); bot.className = 'plan-bot'; bot.append(ul, ...btns, hint);
+  c.append(top, perf, bot); return c;
+}
 function renderPlans(m) {
   const grid = $('#planGrid'), verbo = m.teste ? 'Assinar' : 'Renovar';
   grid.replaceChildren(...m.planos.map(p => {
     const c = document.createElement('article'); c.className = 'plan' + (p.destaque ? ' hot' : '');
-    if (p.destaque) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'Mais escolhido'; c.append(t); }
     const h = document.createElement('h3'); h.textContent = p.nome;
+    if (p.destaque) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'Mais escolhido'; h.append(t); }
     const pr = document.createElement('div'); pr.className = 'price';
     const b = document.createElement('b'); b.textContent = brl(p.preco); const sm = document.createElement('small'); sm.textContent = '/ ' + p.dias + (p.dias === 1 ? ' dia' : ' dias'); pr.append(b, sm);
     const per = document.createElement('p'); per.className = 'per'; per.textContent = 'equivale a ' + brl(p.preco / p.dias) + ' por dia';
@@ -116,7 +132,7 @@ function renderPlans(m) {
     const pix = document.createElement('button'); pix.type = 'button'; pix.className = 'btn ' + (p.destaque ? 'primary' : ''); pix.textContent = verbo + ' com Pix'; pix.onclick = () => comprar(p, pix, 'pix');
     const card = document.createElement('button'); card.type = 'button'; card.className = 'btn card-btn'; card.textContent = verbo + ' com cartão'; card.onclick = () => comprar(p, card, 'mp');
     const hint = document.createElement('p'); hint.className = 'meios'; hint.textContent = 'Cartão de crédito, débito ou boleto';
-    c.append(h, pr, per, ul, pix, card, hint); return c;
+    return ticket(c, h, pr, per, ul, [pix, card], hint);
   }));
 }
 async function comprar(p, btn, metodo) {
@@ -180,6 +196,45 @@ function acompanha(id) {
   poll = setInterval(() => { if (Date.now() - t0 > 30 * 60e3) { clearInterval(poll); return; } checa(id, false); }, 3000);
 }
 
+
+/* ---------- avisos de vencimento (notificação push) ---------- */
+const PUSH_OK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const b64 = s => { const p = '='.repeat((4 - s.length % 4) % 4), r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, c => c.charCodeAt(0)); };
+async function pushSub() { try { const reg = await navigator.serviceWorker.getRegistration('/cliente/'); return reg ? await reg.pushManager.getSubscription() : null; } catch { return null; } }
+async function pushRender() {
+  const box = $('#pushBox'), btn = $('#pushBtn'), dias = (cfg.push && cfg.push.dias && cfg.push.dias[0]) || 3;
+  box.hidden = !(cfg.push && cfg.push.on && me && me.status !== 'bloqueado');
+  if (box.hidden) return;
+  $('#pushP').textContent = 'Receba uma notificação neste aparelho quando faltarem ' + dias + ' dias para o acesso vencer.';
+  if (!PUSH_OK) {
+    btn.hidden = true;
+    $('#pushP').textContent = /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'No iPhone, toque em Compartilhar e em "Adicionar à Tela de Início". Depois abra o Painel por lá e ative os avisos.' : 'Este navegador não aceita notificações. Tente pelo Chrome ou pelo Firefox.';
+    return;
+  }
+  btn.hidden = false;
+  const sub = await pushSub();
+  if (Notification.permission === 'denied') { btn.hidden = true; $('#pushP').textContent = 'As notificações estão bloqueadas neste navegador. Libere nas configurações do site para receber os avisos.'; return; }
+  $('#pushT').textContent = sub ? 'Avisos ativados' : 'Avisos de vencimento';
+  btn.textContent = sub ? 'Desativar avisos' : 'Ativar avisos'; btn.className = 'btn ' + (sub ? 'ghost' : 'primary');
+  if (sub) $('#pushP').textContent = 'Este aparelho vai receber um aviso aos ' + dias + ' dias, 1 dia e no dia do vencimento.';
+}
+async function pushToggle() {
+  const btn = $('#pushBtn'); btn.disabled = true;
+  try {
+    const sub = await pushSub();
+    if (sub) {
+      await api('/api/cliente/push/unsub', { method: 'POST', body: JSON.stringify({ endpoint: sub.endpoint }) }); await sub.unsubscribe();
+    } else {
+      const perm = await Notification.requestPermission(); if (perm !== 'granted') throw new Error('Sem permissão para notificar.');
+      const reg = await navigator.serviceWorker.register('/cliente/sw.js', { scope: '/cliente/' }); await navigator.serviceWorker.ready;
+      const nova = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(cfg.push.key) });
+      const { r, d } = await api('/api/cliente/push/sub', { method: 'POST', body: JSON.stringify({ sub: nova.toJSON() }) });
+      if (!r.ok) { await nova.unsubscribe(); throw new Error(d.error || 'Não foi possível ativar os avisos.'); }
+    }
+  } catch (e) { alert(e.message || 'Não foi possível concluir.'); }
+  btn.disabled = false; pushRender();
+}
+
 /* olhinho: mostra/esconde a senha digitada, para conferir e corrigir */
 function pwEye(input) {
   const w = document.createElement('div'), b = document.createElement('button');
@@ -192,6 +247,8 @@ function pwEye(input) {
 /* ---------- início ---------- */
 (async () => {
   try { cfg = await (await fetch('/api/cliente/config')).json(); } catch { }
+  try { cfg.push = await (await fetch('/api/cliente/push/config')).json(); } catch { }
+  $('#pushBtn').onclick = pushToggle;
   $('#lhelp').hidden = !cfg.teste;
   pwEye($('#lp'));
   $('#fLogin').addEventListener('submit', entrar);
