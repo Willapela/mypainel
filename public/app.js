@@ -18,7 +18,8 @@ const VIEWS = {
   users: ['Usuários', 'Gerencie contas, validade, limites e bloqueios.'],
   online: ['Conectados', 'Quem está usando o servidor agora.'],
   rev: ['Revendas', 'Controle de revendedores e limites de usuários.'],
-  sales: ['Vendas', 'Pedidos pagos pelo Mercado Pago na página de teste.']
+  sales: ['Vendas', 'Pedidos pagos pelo Mercado Pago na página de teste.'],
+  cfg: ['Configurações', 'CheckUser e ajustes do servidor.']
 };
 
 /* ---------- helpers de DOM ---------- */
@@ -200,12 +201,12 @@ function show(ok) {
   if (!ok) { stopPolls(); S.onSig = ''; S.clock = {}; S.users = []; S.on = {}; S.onRows = []; closeMenu(); }
 }
 function setView(v, keepHash) {
-  if (!VIEWS[v] || ((v === 'rev' || v === 'sales') && S.me.role !== 'admin')) v = 'home';
+  if (!VIEWS[v] || ((v === 'rev' || v === 'sales' || v === 'cfg') && S.me.role !== 'admin')) v = 'home';
   S.view = v; S.onSig = '';
   $$('.nav-item').forEach(t => { const on = t.dataset.v === v; t.classList.toggle('on', on); if (on) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current'); });
   Object.keys(VIEWS).forEach(x => { $('#v-' + x).hidden = x !== v; });
   $('#pageTitle').textContent = VIEWS[v][0]; $('#pageSub').textContent = VIEWS[v][1];
-  $('#newBtn').hidden = v === 'online' || v === 'sales';
+  $('#newBtn').hidden = v === 'online' || v === 'sales' || v === 'cfg';
   $('#testBtn').hidden = !(v === 'home' || v === 'users');
   $('#newLbl').textContent = v === 'rev' ? 'Nova revenda' : 'Novo usuário';
   if (!keepHash) { try { history.replaceState(null, '', v === 'home' ? location.pathname : '#' + v); } catch { } }
@@ -638,8 +639,50 @@ function refreshView() {
   loadOnline().catch(() => { });
   if (S.view === 'rev') loadRev().catch(e => toast(e.message));
   if (S.view === 'sales') loadSales().catch(e => toast(e.message));
+  if (S.view === 'cfg') loadCu().catch(e => toast(e.message));
 }
 function refreshAll() { refreshView(); }
+
+/* ---------- Configurações: CheckUser ---------- */
+let CU = null;
+function cuPill(v) { const ok = v === 'active'; return el('span', 'cu-pill ' + (ok ? 'ok' : 'bad'), ok ? 'Ativo' : (v === 'activating' ? 'Iniciando' : 'Parado')); }
+function cuRender(d) {
+  CU = d; $('#cuNone').hidden = !!d.installed; $('#cuBody').hidden = !d.installed;
+  if (!d.installed) return;
+  $('#cuSvc').replaceChildren(cuPill(d.service)); $('#cuTun').replaceChildren(cuPill(d.tunnel));
+  $('#cuPort').textContent = d.port;
+  $('#cuHealth').textContent = d.health && d.health.ok ? 'OK' + (d.health.ms != null ? ' · ' + d.health.ms + ' ms' : '') : 'Sem resposta';
+  $('#cuLink').value = d.link || ''; $('#cuLink').placeholder = 'Sem link ainda (túnel parado?)';
+  $('#cuApp').value = d.appUrl || d.localUrl || '';
+}
+async function loadCu() { cuRender(await api('/api/checkuser')); }
+async function cuDo(btn, fn, okMsg) {
+  const old = btn.disabled; btn.disabled = true;
+  try { const d = await fn(); if (d && d.installed !== undefined) cuRender(d); toast(okMsg); }
+  catch (e) { toast(e.message); } finally { btn.disabled = old; }
+}
+async function cuCopy(id) {
+  const v = $(id).value; if (!v) return toast('Nada para copiar.');
+  try { const r = await copyText(v); toast(r === 'manual' ? 'Selecione e copie manualmente.' : 'Copiado'); } catch { toast('Não foi possível copiar.'); }
+}
+$('#cuRefresh').onclick = () => loadCu().then(() => toast('Atualizado')).catch(e => toast(e.message));
+$('#cuCopyLink').onclick = () => cuCopy('#cuLink');
+$('#cuCopyApp').onclick = () => cuCopy('#cuApp');
+$('#cuRestart').onclick = e => cuDo(e.currentTarget, () => api('/api/checkuser/restart', 'POST', { alvo: 'service' }), 'Serviço reiniciado');
+$('#cuNew').onclick = async e => {
+  const b = e.currentTarget;
+  if (!(await ask('Gerar novo link?', 'O túnel será reiniciado e o link público muda. Depois é preciso colocar a nova URL no app.', 'Gerar'))) return;
+  cuDo(b, () => api('/api/checkuser/restart', 'POST', { alvo: 'newlink', antigo: (CU && CU.link) || '' }), 'Novo link gerado');
+};
+$('#cuLogBtn').onclick = async () => {
+  const p = $('#cuLog'); if (!p.hidden) { p.hidden = true; return; }
+  try { const d = await api('/api/checkuser/log'); p.textContent = d.log || 'Sem registros.'; p.hidden = false; } catch (e) { toast(e.message); }
+};
+$('#cuDel').onclick = async e => {
+  const b = e.currentTarget;
+  if (!(await ask('Remover o CheckUser?', 'Para o serviço e o túnel e apaga os arquivos do CheckUser. Seus usuários e o SSHPlus não são afetados. O app deixará de consultar validade até você reinstalar.', 'Remover', true))) return;
+  cuDo(b, () => api('/api/checkuser/remove', 'POST', { confirma: 'REMOVER' }).then(() => ({ installed: false })), 'CheckUser removido');
+};
 
 let timers = [];
 function stopPolls() { timers.forEach(clearInterval); timers = []; }
@@ -655,7 +698,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && !$
 
 function start(m) {
   S.me = m; const admin = m.role === 'admin';
-  $('#tabRev').hidden = !admin; $('#tabSales').hidden = !admin;
+  $('#tabRev').hidden = !admin; $('#tabSales').hidden = !admin; $('#tabCfg').hidden = !admin;
   setText('#meName', m.name || 'admin'); setText('#meRole', admin ? 'Administrador' : 'Revenda');
   setText('#meAv', String(m.name || 'A').slice(0, 1).toUpperCase());
   setText('#meName2', m.name || 'admin'); setText('#meRole2', admin ? 'Administrador' : 'Revenda'); setText('#meAv2', String(m.name || 'A').slice(0, 1).toUpperCase());

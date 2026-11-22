@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css?v=v8">
+<link rel="stylesheet" href="/style.css?v=v9">
 </head>
 <body>
 
@@ -21,6 +21,7 @@
     <symbol id="i-home" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1.5"/><rect width="7" height="5" x="14" y="3" rx="1.5"/><rect width="7" height="9" x="14" y="12" rx="1.5"/><rect width="7" height="5" x="3" y="16" rx="1.5"/></symbol>
     <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
     <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.8l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.8v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
     <symbol id="i-store" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
     <symbol id="i-flask" viewBox="0 0 24 24"><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></symbol>
@@ -88,6 +89,7 @@
       <button class="nav-item" data-v="online" type="button"><svg class="ic"><use href="#i-activity"/></svg><span>Online</span><em id="onCount" class="count live">0</em></button>
       <button class="nav-item" data-v="rev" id="tabRev" type="button"><svg class="ic"><use href="#i-store"/></svg><span>Revendas</span></button>
       <button class="nav-item" data-v="sales" id="tabSales" type="button"><svg class="ic"><use href="#i-coin"/></svg><span>Vendas</span></button>
+      <button class="nav-item" data-v="cfg" id="tabCfg" type="button"><svg class="ic"><use href="#i-gear"/></svg><span>Ajustes</span></button>
     </nav>
 
     <div class="side-foot">
@@ -317,6 +319,33 @@
           <p id="emptySales" class="empty" hidden><span class="empty-ic"><svg class="ic"><use href="#i-coin"/></svg></span><strong>Nenhuma venda ainda</strong><span>As compras feitas na página /teste aparecem aqui.</span></p>
         </article>
       </section>
+
+      <!-- ===== CONFIGURAÇÕES / CHECKUSER ===== -->
+      <section id="v-cfg" class="view" hidden>
+        <article class="card" id="cuCard">
+          <div class="card-h"><div><h2>CheckUser</h2><p class="muted">Serviço que o app (DTunnel / Void Pro) consulta para mostrar validade e limite.</p></div>
+            <button id="cuRefresh" class="btn" type="button"><svg class="ic"><use href="#i-reset"/></svg><span>Atualizar</span></button></div>
+          <p id="cuNone" class="empty" hidden><span class="empty-ic"><svg class="ic"><use href="#i-server"/></svg></span><strong>CheckUser não instalado</strong><span>Instale pelo script do check-final e volte aqui.</span></p>
+          <div id="cuBody" hidden>
+            <div class="cu-grid">
+              <div class="cu-stat"><span class="kpi-l">Serviço</span><strong id="cuSvc">-</strong></div>
+              <div class="cu-stat"><span class="kpi-l">Túnel Cloudflare</span><strong id="cuTun">-</strong></div>
+              <div class="cu-stat"><span class="kpi-l">Porta</span><strong id="cuPort">-</strong></div>
+              <div class="cu-stat"><span class="kpi-l">Resposta local</span><strong id="cuHealth">-</strong></div>
+            </div>
+            <label class="field">Link público (túnel)<div class="cu-line"><input id="cuLink" readonly><button id="cuCopyLink" class="btn" type="button"><svg class="ic"><use href="#i-copy"/></svg><span>Copiar</span></button></div></label>
+            <label class="field">URL para colocar no app<div class="cu-line"><input id="cuApp" readonly><button id="cuCopyApp" class="btn" type="button"><svg class="ic"><use href="#i-copy"/></svg><span>Copiar</span></button></div></label>
+            <div class="cu-actions">
+              <button id="cuRestart" class="btn" type="button"><svg class="ic"><use href="#i-reset"/></svg><span>Reiniciar serviço</span></button>
+              <button id="cuNew" class="btn" type="button"><svg class="ic"><use href="#i-zap"/></svg><span>Gerar novo link</span></button>
+              <button id="cuLogBtn" class="btn" type="button"><span>Ver logs</span></button>
+              <button id="cuDel" class="btn danger" type="button"><svg class="ic"><use href="#i-trash"/></svg><span>Remover CheckUser</span></button>
+            </div>
+            <pre id="cuLog" class="cu-log" hidden></pre>
+            <p class="muted cu-note">Remover apaga só o CheckUser e o túnel. Usuários, limites (/root/usuarios.db) e o SSHPlus continuam intactos. O link do túnel grátis muda quando o túnel reinicia: atualize a URL no app.</p>
+          </div>
+        </article>
+      </section>
     </div>
     <footer class="app-foot">
       <div class="me"><div class="me-av" id="meAv2">A</div><div class="me-txt"><strong id="meName2">admin</strong><span id="meRole2">Administrador</span></div></div>
@@ -336,6 +365,6 @@
 <dialog id="testDlg"><div class="dlg-card"><h2 id="credTitle">Usuário criado</h2><p class="muted" id="credSub"></p><div class="cred-box" id="credBox"></div><label class="field">Texto completo<textarea id="testCopyArea" readonly rows="5"></textarea></label><div class="row wrap"><button type="button" class="btn" id="credNew" hidden>Gerar novo UUID</button><button type="button" class="btn" id="testCopy"><svg class="ic"><use href="#i-copy"/></svg> Copiar tudo</button><button type="button" class="btn primary" id="testOk">Ok</button></div></div></dialog>
 
 <div id="toast" role="status" aria-live="polite"></div>
-<script src="/app.js?v=v8"></script>
+<script src="/app.js?v=v9"></script>
 </body>
 </html>
