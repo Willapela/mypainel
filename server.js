@@ -845,7 +845,7 @@ if (T.on) {
 
   app.use('/teste', (req, res, next) => {
     res.setHeader('Content-Security-Policy',
-      "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'");
+      "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'");
     next();
   });
   app.use('/teste', express.static(path.join(__dirname, 'public-teste'), { setHeaders: r => r.setHeader('Cache-Control', 'no-cache') }));
@@ -1067,10 +1067,57 @@ if (SALE.on) {
 }
 
 // ===== Área do cliente: /cliente (entra com o usuário e a senha do próprio acesso) =====
+// ===== Avisos de vencimento por notificação push (3 dias, 1 dia e no dia) =====
+let WP = null; try { WP = require('web-push'); } catch { }
+const PUSH = {
+  on: !!WP && process.env.PUSH_AVISOS !== '0',
+  dias: (process.env.PUSH_DIAS || '3,1,0').split(',').map(x => parseInt(x, 10)).filter(n => n >= 0),
+  tz: Number.isFinite(parseFloat(process.env.PUSH_TZ)) ? parseFloat(process.env.PUSH_TZ) : -3,   // fuso do servidor em horas (Brasília = -3)
+  de: Number.isFinite(parseInt(process.env.PUSH_HORA_DE, 10)) ? parseInt(process.env.PUSH_HORA_DE, 10) : 9, ate: Number.isFinite(parseInt(process.env.PUSH_HORA_ATE, 10)) ? parseInt(process.env.PUSH_HORA_ATE, 10) : 20,
+  contato: process.env.PUSH_CONTATO || (/^https:/.test(process.env.PUBLIC_URL || '') ? process.env.PUBLIC_URL : 'mailto:admin@example.com'),
+  hosts: /^https:\/\/([a-z0-9-]+\.)*(googleapis\.com|mozilla\.com|push\.apple\.com|notify\.windows\.com|windows\.com)\//i
+};
+if (PUSH.on) {
+  S.push = S.push || {}; S.push.subs = S.push.subs || {}; S.push.sent = S.push.sent || {};
+  if (!S.push.vapid) { S.push.vapid = WP.generateVAPIDKeys(); save(); }
+  try { WP.setVapidDetails(PUSH.contato, S.push.vapid.publicKey, S.push.vapid.privateKey); } catch (e) { console.error('push desativado:', e.message); PUSH.on = false; }
+}
+async function pushTo(u, payload) {
+  const list = ((S.push.subs[u]) || []).slice(); let ok = 0, mudou = false;
+  for (const s of list) {
+    try { await WP.sendNotification(s, JSON.stringify(payload), { TTL: 86400 }); ok++; }
+    catch (e) {
+      if (e.statusCode === 404 || e.statusCode === 410) { S.push.subs[u] = (S.push.subs[u] || []).filter(x => x.endpoint !== s.endpoint); mudou = true; }
+      else console.error('push:', e.statusCode || e.message);
+    }
+  }
+  if (S.push.subs[u] && !S.push.subs[u].length) delete S.push.subs[u];
+  if (mudou) save();
+  return ok;
+}
+const pushTexto = d => d <= 0 ? ['Seu acesso vence hoje', 'Renove agora para não ficar sem conexão.'] : d === 1 ? ['Seu acesso vence amanhã', 'Falta 1 dia. Renove com Pix ou cartão e continue conectado.'] : ['Seu acesso vence em ' + d + ' dias', 'Renove com Pix ou cartão e os dias são somados à sua validade.'];
+async function avisaVencimentos() {
+  if (!PUSH.on) return;
+  const agora = new Date(Date.now() + PUSH.tz * 3600e3), hora = agora.getUTCHours(), hoje = agora.toISOString().slice(0, 10);
+  if (hora < PUSH.de || hora >= PUSH.ate) return;
+  const users = new Map(sysUsers().map(x => [x.usuario, x]));
+  for (const u of Object.keys(S.push.subs)) {
+    const su = users.get(u);
+    if (!su) { delete S.push.subs[u]; delete S.push.sent[u]; save(); continue; }
+    if ((S.meta[u] || {}).blocked || S.tst.some(t => t.u === u) || !su.expira) continue;
+    const dias = Math.round((Date.parse(su.expira + 'T00:00:00Z') - Date.parse(hoje + 'T00:00:00Z')) / DIA);
+    if (!PUSH.dias.includes(dias)) continue;
+    const key = su.expira + ':' + dias; if (S.push.sent[u] === key) continue;
+    const [title, body] = pushTexto(dias);
+    if (await pushTo(u, { title, body, url: '/cliente/' })) { S.push.sent[u] = key; save(); }
+  }
+}
+if (PUSH.on) { setTimeout(() => avisaVencimentos().catch(e => console.error('avisos:', e.message)), 20e3).unref(); setInterval(() => avisaVencimentos().catch(e => console.error('avisos:', e.message)), 30 * 60e3).unref(); }
+
 const CLI = { on: process.env.CLIENTE_AREA !== '0', sess: new Map(), falhas: new Map() };
 if (CLI.on) {
   app.use('/cliente', (req, res, next) => {
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'");
     next();
   });
   app.use('/cliente', express.static(path.join(__dirname, 'public-cliente'), { setHeaders: r => r.setHeader('Cache-Control', 'no-cache') }));
@@ -1130,6 +1177,23 @@ if (CLI.on) {
     if (!SALE.on) throw fail('Renovação online indisponível no momento. Fale com o suporte.');
     if ((S.meta[req.cu] || {}).blocked) throw fail('Conta bloqueada. Fale com o suporte.');
     return criaPedido(req.body || {}, { renovacao: req.cu });
+  }));
+  // --- avisos de vencimento (push) ---
+  app.get('/api/cliente/push/config', lim(60), (req, res) => res.json(PUSH.on ? { on: true, key: S.push.vapid.publicKey, dias: PUSH.dias } : { on: false }));
+  app.post('/api/cliente/push/sub', lim(12), cli, run(async req => {
+    if (!PUSH.on) throw fail('Avisos por notificação não estão ativos.');
+    const s = (req.body || {}).sub || {}, k = s.keys || {};
+    if (typeof s.endpoint !== 'string' || s.endpoint.length > 1000 || !PUSH.hosts.test(s.endpoint) || typeof k.p256dh !== 'string' || typeof k.auth !== 'string' || k.p256dh.length > 200 || k.auth.length > 100) throw fail('Este aparelho não aceita notificações.');
+    const u = req.cu, lista = (S.push.subs[u] || []).filter(x => x.endpoint !== s.endpoint);
+    lista.push({ endpoint: s.endpoint, keys: { p256dh: k.p256dh, auth: k.auth }, criado: Date.now() });
+    S.push.subs[u] = lista.slice(-5); delete S.push.sent[u]; save();
+    const ok = await pushTo(u, { title: 'Avisos ativados', body: 'Você vai receber um aviso quando seu acesso estiver perto de vencer.', url: '/cliente/' }).catch(() => 0);
+    return { ok: true, enviado: ok > 0 };
+  }));
+  app.post('/api/cliente/push/unsub', lim(12), cli, run(async req => {
+    const ep = String((req.body || {}).endpoint || ''), u = req.cu;
+    if (S.push && S.push.subs[u]) { S.push.subs[u] = S.push.subs[u].filter(x => x.endpoint !== ep); if (!S.push.subs[u].length) delete S.push.subs[u]; save(); }
+    return { ok: true };
   }));
   setInterval(() => { const n = Date.now(); for (const [k, v] of CLI.sess) if (v.exp < n) CLI.sess.delete(k); }, 10 * 60e3).unref();
   console.log('Área do cliente em /cliente');
