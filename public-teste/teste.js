@@ -59,6 +59,13 @@ async function gerar() {
 }
 
 /* ---------- planos / compra ---------- */
+
+function ticket(c, h, pr, per, ul, btns, hint) {
+  const top = document.createElement('div'); top.className = 'plan-top'; top.append(h, pr, per);
+  const perf = document.createElement('div'); perf.className = 'perf';
+  const bot = document.createElement('div'); bot.className = 'plan-bot'; bot.append(ul, ...btns, hint);
+  c.append(top, perf, bot); return c;
+}
 function renderPlans() {
   const list = cfg.planos || [], grid = $('#planGrid');
   $('#planos').hidden = !list.length;
@@ -67,8 +74,8 @@ function renderPlans() {
   const min = Math.min(...list.map(p => p.preco / p.dias)); $('#fromTxt').textContent = 'Planos a partir de ' + brl(min) + ' por dia'; $('#fromChip').hidden = false;
   grid.replaceChildren(...list.map(p => {
     const c = document.createElement('article'); c.className = 'plan' + (p.destaque ? ' hot' : '');
-    if (p.destaque) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'Mais escolhido'; c.append(t); }
     const h = document.createElement('h3'); h.textContent = p.nome;
+    if (p.destaque) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'Mais escolhido'; h.append(t); }
     const pr = document.createElement('div'); pr.className = 'price';
     const b = document.createElement('b'); b.textContent = brl(p.preco); const sm = document.createElement('small'); sm.textContent = '/ ' + p.dias + (p.dias === 1 ? ' dia' : ' dias'); pr.append(b, sm);
     const per = document.createElement('p'); per.className = 'per'; per.textContent = 'equivale a ' + brl(p.preco / p.dias) + ' por dia';
@@ -79,7 +86,7 @@ function renderPlans() {
     const alt = document.createElement('button'); alt.type = 'button'; alt.className = 'btn card-btn'; alt.textContent = 'Pagar com cartão';
     alt.onclick = () => comprar(p, alt, 'mp');
     const hint = document.createElement('p'); hint.className = 'meios'; hint.textContent = 'Cartão de crédito, débito ou boleto';
-    c.append(h, pr, per, ul, btn, alt, hint); return c;
+    return ticket(c, h, pr, per, ul, [btn, alt], hint);
   }));
 }
 async function comprar(p, btn, metodo) {

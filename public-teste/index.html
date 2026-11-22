@@ -3,11 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#07050f">
+<meta name="theme-color" content="#3355ff">
 <meta name="robots" content="noindex">
 <meta name="description" content="Gere um teste grátis ou assine um plano. Pagou com Pix ou cartão, seu acesso é liberado na hora.">
 <title>Teste grátis e planos</title>
-<link rel="stylesheet" href="/teste/teste.css?v=v7">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/teste/teste.css?v=v9">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -25,13 +28,18 @@
   <symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-7-7 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5.2 9.2a9.5 9.5 0 0 1 13.6 0"/><path d="M8.2 12.4a5.2 5.2 0 0 1 7.6 0"/></g><circle cx="12" cy="16.4" r="1.9" fill="currentColor"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></g></symbol>
+  <symbol id="i-laptop" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M2 20h20"/></g></symbol>
+  <symbol id="i-tablet" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M11 17h2"/></g></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.4 6.8a8 8 0 1 0 11.2 0"/></g></symbol>
+  <symbol id="i-pix" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.5 21.5 12 12 21.5 2.5 12z"/><path d="M8.5 12h7M12.5 9l3 3-3 3"/></g></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></g></symbol>
 </svg>
-
-<div class="orb o1"></div><div class="orb o2"></div><div class="grid-bg"></div>
 
 <header class="nav">
   <div class="c nav-in">
-    <a class="brand" href="#topo"><span class="logo">P</span><span>Painel</span></a>
+    <a class="brand" href="#topo"><span class="logo"><svg aria-hidden="true"><use href="#i-wave"/></svg></span><span>Painel</span></a>
     <nav class="nav-links" id="navLinks" aria-label="Seções">
       <a href="#como">Como funciona</a>
       <a href="#vantagens">Vantagens</a>
@@ -51,25 +59,30 @@
       <div id="payWait" hidden>
         <div class="spinner" aria-hidden="true"></div>
         <h2>Confirmando seu pagamento…</h2>
-        <p class="muted">Pode levar alguns segundos. Não feche esta página — seu acesso aparece aqui assim que o pagamento for aprovado.</p>
+        <p class="muted">Pode levar alguns segundos. Não feche esta página: seu acesso aparece aqui assim que o pagamento for aprovado.</p>
         <a id="payRetry" class="btn ghost" hidden>Abrir o pagamento de novo</a>
       </div>
       <div id="payPix" hidden>
         <h2>Pague com Pix</h2>
         <p class="muted" id="pixInfo">Escaneie o QR Code no app do seu banco ou copie o código.</p>
-        <img id="pixQr" class="qr" alt="QR Code do Pix" width="220" height="220" hidden>
+        <img id="pixQr" class="qr" alt="QR Code do Pix" width="230" height="230" hidden>
         <div class="pixcode"><code id="pixCode"></code><button type="button" id="pixCopy">Copiar código Pix</button></div>
         <p class="timer" id="pixTimer"></p>
-        <p class="muted small">Assim que o pagamento for confirmado, seu usuário e senha aparecem aqui sozinhos. Não feche esta página.</p>
+        <ol class="pay-steps">
+          <li>Abra o app do seu banco e escolha Pix.</li>
+          <li>Leia o QR Code ou cole o código copiado.</li>
+          <li>Confirme o pagamento. Seu acesso aparece aqui sozinho.</li>
+        </ol>
         <button type="button" id="pixNew" class="btn ghost" hidden>Gerar novo Pix</button>
       </div>
       <div id="payOk" hidden>
-        <div class="badge-ok"><svg><use href="#i-check"/></svg></div>
+        <div class="badge-ok"><svg aria-hidden="true"><use href="#i-check"/></svg></div>
         <h2>Pagamento aprovado!</h2>
         <p class="muted" id="payPlano">Seu acesso já está liberado.</p>
         <dl id="payDados"></dl>
         <p class="warn-note" id="payNota">Guarde esses dados agora. Por segurança, a senha some desta página depois de 24 horas.</p>
         <a id="appDl3" class="btn download" target="_blank" rel="noopener" hidden>Baixar aplicativo</a>
+        <a class="btn ghost" href="/cliente/">Ir para a área do cliente</a>
       </div>
       <div id="payBad" hidden>
         <h2 id="payBadT">Não conseguimos concluir</h2>
@@ -81,68 +94,98 @@
 
   <div id="landing">
     <!-- Destaque -->
-    <section class="hero c">
-      <div class="hero-txt">
-        <span class="pill"><i class="live" aria-hidden="true"></i> Acesso liberado na hora</span>
-        <h1>Conexão rápida e segura, <span class="grad">pronta em segundos</span></h1>
-        <p class="lead">Gere um teste grátis de <b data-horas>algumas horas</b> ou assine um plano. Pagou com Pix ou cartão, seu usuário e senha aparecem na tela — sem esperar ninguém.</p>
-        <div class="cta">
-          <a class="btn primary lg" href="#teste">Gerar teste grátis <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
-          <a class="btn ghost lg" href="#planos" data-needs="plans">Ver planos</a>
-        </div>
-        <ul class="chips">
-          <li><svg aria-hidden="true"><use href="#i-check"/></svg> Sem cartão para testar</li>
-          <li><svg aria-hidden="true"><use href="#i-check"/></svg> Pix e cartão</li>
-          <li id="fromChip" hidden><svg aria-hidden="true"><use href="#i-check"/></svg> <span id="fromTxt"></span></li>
-        </ul>
-      </div>
-
-      <div class="mock" aria-hidden="true">
-        <div class="mock-glow"></div>
-        <div class="phone">
-          <div class="ph-top"><span><i class="live"></i> Conectado</span><span class="bars"><i></i><i></i><i></i><i></i></span></div>
-          <div class="ph-big">Sua conexão<br>está <b>ativa</b></div>
-          <div class="ph-rows">
-            <div><span>Usuário</span><b>cliA1b2c3</b></div>
-            <div><span>Validade</span><b>30 dias</b></div>
-            <div><span>Conexões</span><b>2 aparelhos</b></div>
+    <div class="hero-wrap">
+      <section class="hero">
+        <svg class="rings" viewBox="0 0 900 900" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="450" cy="450" r="110"/><circle cx="450" cy="450" r="190"/><circle cx="450" cy="450" r="270"/><circle cx="450" cy="450" r="350"/><circle cx="450" cy="450" r="430"/></svg>
+        <i class="dots" aria-hidden="true"></i>
+        <div class="c hero-in">
+          <div class="hero-txt">
+            <h1>Gere seu acesso e conecte em segundos</h1>
+            <p class="lead">Teste grátis por <b data-horas>algumas horas</b> ou assine um plano. Pagou com Pix ou cartão, seu usuário e senha aparecem na tela, sem esperar atendimento.</p>
+            <div class="cta">
+              <a class="btn sun lg" href="#teste">Gerar teste grátis <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+              <a class="btn line-w lg" href="#planos" data-needs="plans">Ver planos</a>
+            </div>
+            <ul class="chips">
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg> Sem cartão para testar</li>
+              <li><svg aria-hidden="true"><use href="#i-check"/></svg> Pix e cartão</li>
+              <li id="fromChip" hidden><svg aria-hidden="true"><use href="#i-check"/></svg> <span id="fromTxt"></span></li>
+            </ul>
           </div>
-          <div class="ph-btn">Desconectar</div>
+
+          <div class="live" aria-hidden="true">
+            <div class="dev">
+              <div class="dev-top"><span class="logo"><svg><use href="#i-wave"/></svg></span><b>Painel</b><span class="state"><i></i><span>Liberando…</span></span></div>
+              <ul class="log">
+                <li><span class="ck"><svg><use href="#i-check"/></svg></span>Gerando usuário e senha</li>
+                <li><span class="ck"><svg><use href="#i-check"/></svg></span>Criando seu acesso no servidor</li>
+                <li><span class="ck"><svg><use href="#i-check"/></svg></span>Tudo pronto para conectar</li>
+              </ul>
+              <div class="cred"><div><span>Usuário</span><b>cliA1b2c3</b></div><div><span>Senha</span><b>••••••••</b></div></div>
+              <div class="wave"><i style="--h:30%;animation-delay:3.7s"></i><i style="--h:55%;animation-delay:3.75s"></i><i style="--h:42%;animation-delay:3.8s"></i><i style="--h:78%;animation-delay:3.85s"></i><i style="--h:60%;animation-delay:3.9s"></i><i style="--h:92%;animation-delay:3.95s"></i><i style="--h:68%;animation-delay:4s"></i><i style="--h:100%;animation-delay:4.05s"></i><i style="--h:74%;animation-delay:4.1s"></i><i style="--h:50%;animation-delay:4.15s"></i></div>
+            </div>
+            <div class="chip-float"><svg><use href="#i-bolt"/></svg> Pix aprovado</div>
+            <p class="note">Exemplo ilustrativo</p>
+          </div>
         </div>
-        <div class="float f1"><svg><use href="#i-check"/></svg> Pix aprovado</div>
-        <div class="float f2"><svg><use href="#i-bolt"/></svg> Liberado em segundos</div>
+      </section>
+    </div>
+
+    <!-- Faixa de confiança -->
+    <div class="c">
+      <div class="trust">
+        <div><svg aria-hidden="true"><use href="#i-bolt"/></svg><p><b>Liberação automática</b><span>Pagou, o acesso é criado.</span></p></div>
+        <div><svg aria-hidden="true"><use href="#i-card"/></svg><p><b>Pix, cartão e boleto</b><span>Tudo pelo Mercado Pago.</span></p></div>
+        <div><svg aria-hidden="true"><use href="#i-gift"/></svg><p><b>Teste sem cadastro</b><span>Sem cartão e sem pegadinha.</span></p></div>
+        <div><svg aria-hidden="true"><use href="#i-shield"/></svg><p><b>Pagamento protegido</b><span>Seus dados não passam por aqui.</span></p></div>
       </div>
-    </section>
+    </div>
 
     <!-- Como funciona -->
     <section id="como" class="sec c">
-      <div class="sec-h rv"><span class="eyebrow">Passo a passo</span><h2>Como funciona</h2><p class="muted">Do teste ao plano completo em três passos simples.</p></div>
+      <div class="sec-h"><h2>Do teste ao plano em três passos</h2><p class="muted">Sem fila, sem formulário e sem esperar resposta de ninguém.</p></div>
       <ol class="steps">
-        <li class="step rv"><span class="num">1</span><h3>Gere seu teste</h3><p>Um clique e você recebe usuário e senha de teste. Não precisa de cartão nem de cadastro.</p></li>
-        <li class="step rv"><span class="num">2</span><h3>Escolha seu plano</h3><p>Gostou? Pague com Pix (QR Code ou copia e cola) ou com cartão, direto pelo Mercado Pago.</p></li>
-        <li class="step rv"><span class="num">3</span><h3>Conecte e use</h3><p>Assim que o pagamento é confirmado, o acesso é criado e aparece aqui. É só colocar no aplicativo.</p></li>
+        <li class="step">
+          <div class="art a1"><span class="num">1</span><div class="mini"><div class="fake-btn">Gerar meu teste grátis</div><div class="ln m"></div><div class="ln s"></div></div></div>
+          <div class="body"><h3>Gere seu teste</h3><p>Um clique e você recebe usuário e senha. Não precisa de cartão nem de cadastro.</p></div>
+        </li>
+        <li class="step">
+          <div class="art a2"><span class="num">2</span>
+            <div class="col"><span class="pill on"><svg><use href="#i-pix"/></svg>Pix</span><span class="pill"><svg><use href="#i-card"/></svg>Cartão</span></div>
+            <svg class="qrm" viewBox="0 0 21 21" aria-hidden="true"><path fill="#0b1437" d="M0 0h7v7H0zM14 0h7v7h-7zM0 14h7v7H0zM2 2v3h3V2zM16 2v3h3V2zM2 16v3h3v-3zM9 0h2v2H9zM9 3h3v2H9zM8 6h2v2H8zM11 7h3v2h-3zM0 9h2v2H0zM3 9h3v2H3zM8 9h3v3H8zM13 10h2v2h-2zM17 9h4v2h-4zM9 14h2v3H9zM12 14h3v2h-3zM16 13h2v3h-2zM19 15h2v3h-2zM12 18h3v3h-3zM17 18h2v3h-2zM9 19h2v2H9z"/></svg>
+          </div>
+          <div class="body"><h3>Escolha seu plano</h3><p>Gostou? Pague com Pix (QR Code ou copia e cola) ou com cartão, direto pelo Mercado Pago.</p></div>
+        </li>
+        <li class="step">
+          <div class="art a3"><span class="num">3</span><div class="ph"><div class="scr"><span class="pwr"><svg><use href="#i-power"/></svg></span><small>Conectado</small></div></div></div>
+          <div class="body"><h3>Conecte e use</h3><p>Com o pagamento confirmado, o acesso aparece aqui. É só colocar usuário e senha no aplicativo.</p></div>
+        </li>
       </ol>
     </section>
 
     <!-- Vantagens -->
     <section id="vantagens" class="sec c">
-      <div class="sec-h rv"><span class="eyebrow">Vantagens</span><h2>Feito para ser simples</h2><p class="muted">Tudo automático, do pagamento à liberação.</p></div>
-      <div class="feats">
-        <article class="feat rv"><span class="ico"><svg><use href="#i-bolt"/></svg></span><h3>Liberação automática</h3><p>Pagamento confirmado, acesso criado. Sem fila e sem esperar atendimento.</p></article>
-        <article class="feat rv"><span class="ico"><svg><use href="#i-card"/></svg></span><h3>Pix e cartão</h3><p>Pague como preferir: Pix, cartão de crédito ou débito, ou boleto.</p></article>
-        <article class="feat rv"><span class="ico"><svg><use href="#i-gift"/></svg></span><h3>Teste sem compromisso</h3><p>Experimente antes de assinar. Sem cartão, sem cadastro e sem pegadinha.</p></article>
-        <article class="feat rv"><span class="ico"><svg><use href="#i-users"/></svg></span><h3>Conexões por plano</h3><p>Cada plano mostra quantos aparelhos podem usar o acesso ao mesmo tempo.</p></article>
-        <article class="feat rv"><span class="ico"><svg><use href="#i-shield"/></svg></span><h3>Pagamento protegido</h3><p>O pagamento acontece no Mercado Pago. Você não digita dados de cartão aqui.</p></article>
-        <article class="feat rv" data-needs="wa"><span class="ico"><svg><use href="#i-msg"/></svg></span><h3>Suporte no WhatsApp</h3><p>Ficou com dúvida ou precisa de ajuda? É só chamar, a gente responde por lá.</p></article>
+      <div class="sec-h"><h2>Feito para ser simples</h2><p class="muted">Tudo automático, do pagamento à liberação.</p></div>
+      <div class="bento">
+        <article class="feat big">
+          <span class="ico"><svg><use href="#i-bolt"/></svg></span>
+          <h3>Pagou, está liberado</h3>
+          <p>Assim que o Mercado Pago confirma, o acesso é criado e aparece na mesma página. Sem fila e sem esperar atendimento.</p>
+          <div class="flow"><span><svg><use href="#i-card"/></svg>Pagamento</span><i></i><span><svg><use href="#i-check"/></svg>Confirmado</span><i></i><span><svg><use href="#i-wave"/></svg>Acesso criado</span></div>
+        </article>
+        <article class="feat"><span class="ico"><svg><use href="#i-card"/></svg></span><h3>Pix e cartão</h3><p>Pague como preferir.</p><div class="tags"><span>Pix</span><span>Crédito</span><span>Débito</span><span>Boleto</span></div></article>
+        <article class="feat"><span class="ico"><svg><use href="#i-gift"/></svg></span><h3>Teste sem compromisso</h3><p>Experimente antes de assinar. Sem cartão, sem cadastro e sem pegadinha.</p></article>
+        <article class="feat dev3"><span class="ico"><svg><use href="#i-users"/></svg></span><h3>Conexões por plano</h3><p>Cada plano mostra quantos aparelhos usam o acesso ao mesmo tempo.</p><div class="devs"><svg><use href="#i-phone"/></svg><svg><use href="#i-tablet"/></svg><svg><use href="#i-laptop"/></svg></div></article>
+        <article class="feat"><span class="ico"><svg><use href="#i-shield"/></svg></span><h3>Pagamento protegido</h3><p>O pagamento acontece no Mercado Pago. Você não digita dados de cartão aqui.</p></article>
+        <article class="feat" data-needs="wa"><span class="ico"><svg><use href="#i-msg"/></svg></span><h3>Suporte no WhatsApp</h3><p>Ficou com dúvida? É só chamar, a gente responde por lá.</p></article>
       </div>
     </section>
 
     <!-- Teste grátis -->
     <section id="teste" class="sec c">
-      <div id="trial" class="trial rv">
+      <div id="trial" class="trial">
         <div class="trial-txt">
-          <span class="eyebrow">Sem cartão · sem compromisso</span>
-          <h2>Teste grátis</h2>
+          <h2>Teste grátis, sem cartão</h2>
           <p class="muted" id="intro">Gere seu acesso de teste e veja como funciona.</p>
           <ul class="ticks">
             <li><svg aria-hidden="true"><use href="#i-check"/></svg> Usuário e senha na hora</li>
@@ -152,12 +195,14 @@
         </div>
         <div class="trial-box">
           <div id="pre">
+            <h3>Seu acesso de teste</h3>
+            <p class="muted">Clique no botão e os dados aparecem aqui.</p>
             <div id="ts"></div>
             <p id="err" class="err" role="alert"></p>
             <button id="gerar" class="btn primary lg" type="button">Gerar meu teste grátis</button>
           </div>
           <div id="res" hidden>
-            <p class="ok-line"><svg><use href="#i-check"/></svg> Pronto! Use os dados abaixo no seu aplicativo.</p>
+            <p class="ok-line"><svg aria-hidden="true"><use href="#i-check"/></svg> Pronto! Use os dados abaixo no aplicativo.</p>
             <dl id="dados"></dl>
             <p class="timer" id="tempo"></p>
             <a id="appDl" class="btn download" target="_blank" rel="noopener" hidden>Baixar aplicativo</a>
@@ -168,16 +213,16 @@
 
     <!-- Planos -->
     <section id="planos" class="sec c" hidden>
-      <div class="sec-h"><span class="eyebrow">Planos</span><h2>Gostou? Escolha seu plano</h2><p class="muted">Pagamento seguro pelo Mercado Pago. O acesso é liberado automaticamente na hora.</p></div>
+      <div class="sec-h"><h2>Gostou? Escolha seu plano</h2><p class="muted">Pagamento seguro pelo Mercado Pago. O acesso é liberado automaticamente na hora.</p></div>
       <div id="planGrid" class="plans"></div>
       <p id="planErr" class="err center" role="alert"></p>
-      <p class="secure"><svg><use href="#i-lock"/></svg> Pix, cartão e boleto · Você não digita nenhum dado de pagamento aqui</p>
+      <p class="secure"><svg><use href="#i-lock"/></svg> Você não digita nenhum dado de pagamento nesta página</p>
     </section>
 
     <!-- Dúvidas -->
     <section id="duvidas" class="sec c">
-      <div class="sec-h rv"><span class="eyebrow">Dúvidas</span><h2>Perguntas frequentes</h2></div>
-      <div class="faq rv">
+      <div class="sec-h"><h2>Perguntas frequentes</h2></div>
+      <div class="faq">
         <details><summary>O teste é realmente grátis? <svg aria-hidden="true"><use href="#i-chev"/></svg></summary><p>Sim. Você gera o teste sem cartão e sem cadastro. Cada rede pode gerar um teste por dia.</p></details>
         <details><summary>Quanto tempo leva para liberar depois de pagar? <svg aria-hidden="true"><use href="#i-chev"/></svg></summary><p>Em geral, poucos segundos. Quando o pagamento é confirmado, seu usuário e senha aparecem nesta mesma página. Se você fechar a aba, é só reabrir esta página no mesmo aparelho.</p></details>
         <details><summary>Quais formas de pagamento posso usar? <svg aria-hidden="true"><use href="#i-chev"/></svg></summary><p>Pix (com QR Code ou código copia e cola), cartão de crédito ou débito e boleto, tudo pelo Mercado Pago.</p></details>
@@ -189,10 +234,10 @@
 
     <!-- Chamada final -->
     <section class="c final-wrap">
-      <div class="final rv">
+      <div class="final">
         <h2>Pronto para testar?</h2>
         <p>Gere seu acesso agora e veja a diferença em poucos segundos.</p>
-        <a class="btn light lg" href="#teste">Gerar teste grátis <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        <a class="btn sun lg" href="#teste">Gerar teste grátis <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
       </div>
     </section>
   </div>
@@ -200,14 +245,15 @@
 
 <footer class="foot">
   <div class="c foot-in">
-    <a class="brand" href="#topo"><span class="logo">P</span><span>Painel</span></a>
+    <a class="brand" href="#topo"><span class="logo"><svg aria-hidden="true"><use href="#i-wave"/></svg></span><span>Painel</span></a>
     <div class="links">
       <a class="btn ghost" href="/cliente/">Área do cliente</a>
       <a id="appDl2" class="btn download soft" target="_blank" rel="noopener" hidden>Baixar aplicativo</a>
       <a id="wa2" data-wa class="btn wa soft" target="_blank" rel="noopener" hidden><svg aria-hidden="true"><use href="#i-wa"/></svg>Falar no WhatsApp</a>
     </div>
+    <small>Pagamentos processados pelo Mercado Pago</small>
   </div>
 </footer>
-<script src="/teste/teste.js?v=v7"></script>
+<script src="/teste/teste.js?v=v9"></script>
 </body>
 </html>
