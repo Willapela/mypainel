@@ -178,7 +178,7 @@ app.use(session({
   name: 'sid', secret: SESSION_SECRET, resave: false, saveUninitialized: false,
   cookie: { httpOnly: true, sameSite: 'lax', secure: false, maxAge: 2 * 3600e3 }
 }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { setHeaders: r => r.setHeader('Cache-Control', 'no-cache') }));
 const auth = (req, res, next) => {
   const s = req.session;
   if (s.role === 'rev' && !S.revs.some(r => r.id === s.revId && r.ativo)) s.role = null;
@@ -848,7 +848,7 @@ if (T.on) {
       "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'");
     next();
   });
-  app.use('/teste', express.static(path.join(__dirname, 'public-teste')));
+  app.use('/teste', express.static(path.join(__dirname, 'public-teste'), { setHeaders: r => r.setHeader('Cache-Control', 'no-cache') }));
   app.get(['/teste', '/teste/'], (req, res) => {
     res.sendFile(path.join(__dirname, 'public-teste', 'index.html'));
   });
@@ -1073,7 +1073,7 @@ if (CLI.on) {
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'");
     next();
   });
-  app.use('/cliente', express.static(path.join(__dirname, 'public-cliente')));
+  app.use('/cliente', express.static(path.join(__dirname, 'public-cliente'), { setHeaders: r => r.setHeader('Cache-Control', 'no-cache') }));
   app.get(['/cliente', '/cliente/'], (req, res) => res.sendFile(path.join(__dirname, 'public-cliente', 'index.html')));
 
   const hashDe = u => { const l = fs.readFileSync('/etc/shadow', 'utf8').split('\n').find(x => x.startsWith(u + ':')); return l ? l.split(':')[1].replace(/^!+/, '') : ''; };
@@ -1136,6 +1136,74 @@ if (CLI.on) {
 }
 
 // Lista de vendas para o painel (somente admin)
+// ===== CheckUser (check-final): status, link, reiniciar e remover pelo painel =====
+const CU = {
+  svc: (process.env.CHECKUSER_SERVICE || 'check-dt-voidpro.service').replace(/[^A-Za-z0-9_.@-]/g, ''),
+  tun: (process.env.CHECKUSER_TUNNEL_SERVICE || 'check-dt-voidpro-tunnel.service').replace(/[^A-Za-z0-9_.@-]/g, ''),
+  dir: process.env.CHECKUSER_DIR || '/usr/local/lib/check-dt-voidpro',
+  log: process.env.CHECKUSER_TUNNEL_LOG || '/var/log/check-dt-voidpro-tunnel.log',
+  menu: process.env.CHECKUSER_MENU || '/usr/local/bin/check',
+  unitDir: process.env.CHECKUSER_UNIT_DIR || '/etc/systemd/system',
+  port: parseInt(process.env.CHECKUSER_PORT, 10) || 2052
+};
+const LINK_RE = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/g;
+const sysq = (c, a, t) => sys(c, a, undefined, t || 8000).then(o => String(o), e => { throw e; });
+const unitState = async u => { try { return (await sysq('systemctl', ['is-active', u])).trim(); } catch (e) { const m = /(inactive|failed|activating|deactivating|unknown)/.exec(String(e.message)); return m ? m[1] : 'inactive'; } };
+async function cuInstalled() {
+  try { await sysq('systemctl', ['cat', CU.svc]); return true; } catch { return false; }
+}
+async function cuPort() {
+  try { const m = /--port[ =](\d{2,5})/.exec(await sysq('systemctl', ['cat', CU.svc])); if (m) return +m[1]; } catch { }
+  return CU.port;
+}
+function cuLinkFromLog() {
+  try {
+    const st = fs.statSync(CU.log), n = Math.min(st.size, 262144), fd = fs.openSync(CU.log, 'r'), b = Buffer.alloc(n);
+    fs.readSync(fd, b, 0, n, st.size - n); fs.closeSync(fd);
+    const all = b.toString('utf8').match(LINK_RE); return all && all.length ? all[all.length - 1] : '';
+  } catch { return ''; }
+}
+async function cuLink() {
+  const l = cuLinkFromLog(); if (l) return l;
+  try { const all = (await sysq('journalctl', ['-u', CU.tun, '-n', '200', '--no-pager', '-o', 'cat'], 8000)).match(LINK_RE); return all && all.length ? all[all.length - 1] : ''; } catch { return ''; }
+}
+function cuHealth(port) {
+  return new Promise(ok => {
+    const t0 = Date.now(), r = require('http').get({ host: '127.0.0.1', port, path: '/check?user=__healthcheck__&uuid=&hwid=', timeout: 3000 }, s => { s.resume(); ok({ ok: s.statusCode < 500, ms: Date.now() - t0 }); });
+    r.on('timeout', () => { r.destroy(); ok({ ok: false }); }); r.on('error', () => ok({ ok: false }));
+  });
+}
+async function cuStatus() {
+  if (!(await cuInstalled())) return { installed: false };
+  const port = await cuPort(), [svc, tun, link, health] = await Promise.all([unitState(CU.svc), unitState(CU.tun), cuLink(), cuHealth(port)]);
+  return { installed: true, service: svc, tunnel: tun, port, health, link, appUrl: link ? link + '/check?user={username}&uuid={uuid}&hwid={hwid}' : '', localUrl: 'http://127.0.0.1:' + port + '/check?user={username}&uuid={uuid}&hwid={hwid}' };
+}
+app.get('/api/checkuser', auth, adminOnly, run(() => cuStatus()));
+app.get('/api/checkuser/log', auth, adminOnly, run(async () => {
+  let t = ''; try { t = await sysq('journalctl', ['-u', CU.svc, '-u', CU.tun, '-n', '60', '--no-pager', '-o', 'short'], 8000); } catch { }
+  if (!t) { try { const b = fs.readFileSync(CU.log, 'utf8'); t = b.split('\n').slice(-60).join('\n'); } catch { } }
+  return { log: t.slice(-8000) };
+}));
+app.post('/api/checkuser/restart', auth, adminOnly, csrf, run(async req => {
+  if (!(await cuInstalled())) throw fail('CheckUser não está instalado neste servidor.');
+  const w = String(req.body.alvo || 'service');
+  if (w === 'service' || w === 'both') await sysq('systemctl', ['restart', CU.svc], 20000);
+  if (w === 'tunnel' || w === 'both' || w === 'newlink') await sysq('systemctl', ['restart', CU.tun], 20000);
+  if (w === 'newlink') { for (let i = 0; i < 20; i++) { await new Promise(r => setTimeout(r, 1000)); if (cuLinkFromLog() !== (req.body.antigo || '\0')) break; } }
+  await new Promise(r => setTimeout(r, 800));
+  return cuStatus();
+}));
+app.post('/api/checkuser/remove', auth, adminOnly, csrf, run(async req => {
+  if (String(req.body.confirma || '') !== 'REMOVER') throw fail('Digite REMOVER para confirmar.');
+  if (!(await cuInstalled())) throw fail('CheckUser não está instalado neste servidor.');
+  for (const u of [CU.tun, CU.svc]) { try { await sysq('systemctl', ['disable', '--now', u], 20000); } catch { } }
+  for (const u of [CU.tun, CU.svc]) { try { fs.rmSync(path.join(CU.unitDir, u), { force: true }); } catch { } }
+  try { if (CU.dir && CU.dir.length > 8 && CU.dir !== '/') fs.rmSync(CU.dir, { recursive: true, force: true }); } catch { }
+  for (const f of [CU.menu, CU.log]) { try { fs.rmSync(f, { force: true }); } catch { } }
+  try { await sysq('systemctl', ['daemon-reload']); } catch { }
+  return { ok: true, installed: false };
+}));
+
 app.get('/api/vendas', auth, adminOnly, (req, res) => {
   const now = Date.now(), rows = S.pedidos.slice().sort((a, b) => b.criado - a.criado).slice(0, 300).map(o => ({
     id: o.id, plano: o.plano.nome + (o.renovacao ? ' · renovação' : ''), dias: o.plano.dias, preco: o.plano.preco, status: o.status, criado: o.criado, pagoEm: o.pagoEm || null, usuario: o.usuario || null
