@@ -130,8 +130,8 @@ function renderPlans(m) {
     const ul = document.createElement('ul');
     ['+' + p.dias + (p.dias === 1 ? ' dia' : ' dias') + ' de acesso', p.limite + (p.limite === 1 ? ' conexão simultânea' : ' conexões simultâneas'), 'Liberação automática após o pagamento'].forEach(t => { const li = document.createElement('li'); li.append(icon('check'), document.createTextNode(t)); ul.append(li); });
     const pix = document.createElement('button'); pix.type = 'button'; pix.className = 'btn ' + (p.destaque ? 'primary' : ''); pix.textContent = verbo + ' com Pix'; pix.onclick = () => comprar(p, pix, 'pix');
-    const card = document.createElement('button'); card.type = 'button'; card.className = 'btn card-btn'; card.textContent = verbo + ' com cartão'; card.onclick = () => comprar(p, card, 'mp');
-    const hint = document.createElement('p'); hint.className = 'meios'; hint.textContent = 'Cartão de crédito, débito ou boleto';
+    const card = document.createElement('button'); card.type = 'button'; card.className = 'btn card-btn'; card.textContent = verbo + ' com cartão'; card.onclick = () => comprar(p, card, cfg.cartao ? 'cartao' : 'mp');
+    const hint = document.createElement('p'); hint.className = 'meios'; hint.textContent = cfg.cartao ? 'Crédito ou débito, sem sair desta página' : 'Cartão de crédito, débito ou boleto';
     return ticket(c, h, pr, per, ul, [pix, card], hint);
   }));
 }
@@ -142,16 +142,17 @@ async function comprar(p, btn, metodo) {
   const back = () => { all.forEach(x => x.disabled = false); btn.textContent = old; };
   try {
     const { r, d } = await api('/api/cliente/renovar', { method: 'POST', body: JSON.stringify({ plano: p.id, metodo }) });
-    if (!r.ok || !(d.url || d.pix)) throw new Error(d.error || 'Não foi possível abrir o pagamento agora. Tente de novo.');
+    if (!r.ok || !(d.url || d.pix || d.cartao)) throw new Error(d.error || 'Não foi possível abrir o pagamento agora. Tente de novo.');
     ss.set('pd', d.id);
     if (d.pix) { renderPix(d.pix, 'Plano ' + p.nome + ' · ' + brl(p.preco)); acompanha(d.id); back(); return; }
+    if (d.cartao) { renderCartao(d.cartao, d.id, 'Plano ' + p.nome + ' · ' + brl(p.preco)); back(); return; }
     location.href = d.url;
   } catch (e) { $('#planErr').textContent = e.message; back(); }
 }
 
 /* ---------- acompanhamento do pagamento ---------- */
 function showPay(state) {
-  ['Wait', 'Pix', 'Ok', 'Bad'].forEach(k => { $('#pay' + k).hidden = k !== state; });
+  ['Wait', 'Pix', 'Card', 'Ok', 'Bad'].forEach(k => { $('#pay' + k).hidden = k !== state; });
   if ($('#pay').hidden) view('pay');
 }
 function renderPix(pix, label) {
@@ -186,6 +187,7 @@ async function checa(id, first) {
     if (d.status === 'estornado') return badView('Pagamento estornado', 'Esse pagamento foi devolvido.');
     if (d.status === 'divergente') return badView('Valor do pagamento diferente', 'O valor pago não confere com o plano. Chame no WhatsApp para resolvermos rápido.');
     if (d.pix) { if (pixCode !== d.pix.codigo) renderPix(d.pix, 'Plano ' + d.plano); return; }
+    if (d.cartao && !d.analise) { if ($('#payCard').hidden) renderCartao(d.cartao, id, 'Plano ' + d.plano); return; }
     showPay('Wait'); if (d.url) $('#payRetry').href = d.url;
   } catch { /* tenta de novo no próximo ciclo */ }
 }
@@ -196,6 +198,41 @@ function acompanha(id) {
   poll = setInterval(() => { if (Date.now() - t0 > 30 * 60e3) { clearInterval(poll); return; } checa(id, false); }, 3000);
 }
 
+/* ---------- cartão direto na página (formulário do Mercado Pago) ---------- */
+let brick = null;
+function loadMp() {
+  return new Promise((ok, no) => {
+    if (window.MercadoPago) return ok();
+    const s = document.createElement('script'); s.src = 'https://sdk.mercadopago.com/js/v2'; s.onload = ok;
+    s.onerror = () => no(new Error('Não foi possível carregar o formulário de cartão. Verifique sua conexão ou pague com Pix.')); document.head.append(s);
+  });
+}
+async function renderCartao(c, id, label) {
+  clearInterval(pixTimer); showPay('Card'); window.scrollTo({ top: 0, behavior: 'smooth' });
+  $('#cardInfo').textContent = label + ' — preencha os dados do cartão abaixo. O pagamento é processado pelo Mercado Pago.'; $('#cardErr').textContent = '';
+  try { await loadMp(); } catch (e) { $('#cardErr').textContent = e.message; return; }
+  try { if (brick) await brick.unmount(); } catch { } brick = null; $('#cardBrick').replaceChildren();
+  try {
+    const mpx = new window.MercadoPago(c.key, { locale: 'pt-BR' });
+    brick = await mpx.bricks().create('cardPayment', 'cardBrick', {
+      initialization: { amount: c.valor },
+      customization: { visual: { style: { theme: 'dark' } }, paymentMethods: { minInstallments: 1, maxInstallments: c.parcelas || 1 } },
+      callbacks: {
+        onReady: () => { },
+        onSubmit: async data => {
+          $('#cardErr').textContent = '';
+          let r, d; try { r = await fetch('/api/pedidos/' + encodeURIComponent(id) + '/cartao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); d = await r.json().catch(() => ({})); } catch { r = { ok: false }; d = {}; }
+          if (!r.ok) { $('#cardErr').textContent = d.error || 'Sem conexão. Tente de novo.'; throw new Error('falhou'); }
+          if (d.status === 'recusado') { $('#cardErr').textContent = d.msg; throw new Error('recusado'); }
+          acompanha(id);
+        },
+        onError: e => { console.warn('cartão:', e && (e.message || e.type)); }
+      }
+    });
+  } catch (e) { $('#cardErr').textContent = 'Não foi possível abrir o formulário de cartão. Tente de novo ou pague com Pix.'; }
+}
+
+$('#cardBack').onclick = () => { try { if (brick) brick.unmount(); } catch { } brick = null; voltaConta(); };
 
 /* ---------- avisos de vencimento (notificação push) ---------- */
 const PUSH_OK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;

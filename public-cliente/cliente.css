@@ -155,6 +155,10 @@ dl .row button:hover{background:var(--cobalt);border-color:var(--cobalt);color:#
   .price b{font-size:40px}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important;scroll-behavior:auto!important}}
+.brick{width:100%;min-height:220px;text-align:left}
+#payCard .secure{margin-top:4px}
+.brick{width:100%;min-height:220px;text-align:left}
+#payCard .secure{margin-top:4px}
 
 /* ======== /cliente ======== */
 .main{padding:26px 0 10px;min-height:calc(100vh - 260px)}

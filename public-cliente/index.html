@@ -11,7 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="manifest" href="/cliente/manifest.webmanifest">
 <link rel="icon" href="/cliente/icon.png">
-<link rel="stylesheet" href="/cliente/cliente.css?v=v10">
+<link rel="stylesheet" href="/cliente/cliente.css?v=v11">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -160,6 +160,14 @@
       </ol>
       <button type="button" id="pixNew" class="btn ghost" hidden>Voltar</button>
     </div>
+    <div id="payCard" hidden>
+      <h2>Pague com cartão</h2>
+      <p class="muted" id="cardInfo"></p>
+      <div id="cardBrick" class="brick"></div>
+      <p id="cardErr" class="err" role="alert"></p>
+      <p class="secure"><svg aria-hidden="true"><use href="#i-lock"/></svg> Os dados do cartão são enviados direto ao Mercado Pago</p>
+      <button type="button" id="cardBack" class="btn ghost">Voltar para minha conta</button>
+    </div>
     <div id="payOk" hidden>
       <div class="badge-ok"><svg aria-hidden="true"><use href="#i-check"/></svg></div>
       <h2 id="okT">Pagamento aprovado!</h2>
@@ -182,6 +190,6 @@
     <small>Área do cliente. Pagamentos processados pelo Mercado Pago</small>
   </div>
 </footer>
-<script src="/cliente/cliente.js?v=v10"></script>
+<script src="/cliente/cliente.js?v=v11"></script>
 </body>
 </html>
