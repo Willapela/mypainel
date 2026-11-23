@@ -486,6 +486,7 @@ app.post('/api/users', auth, csrf, run(async req => {
   await sys('useradd', ['-M', '-s', '/bin/false', ...(d ? ['-e', d] : []), usuario]);
   try { await sys('chpasswd', [], `${usuario}:${senha}\n`); }
   catch (e) { await sys('userdel', [usuario]).catch(() => { }); throw e; }
+  guardaSenha(usuario, senha);
   const m = readLimits(); m.set(usuario, n); writeLimits(m);
   if (rev) { S.map[usuario] = req.session.revId; save(); }
   // sincroniza no DragonCore (não bloqueia se falhar)
@@ -499,6 +500,7 @@ app.put('/api/users/:name', auth, csrf, run(async req => {
   if ('senha' in b && b.senha) {
     if (b.senha.length < 4 || b.senha.length > 64 || /[\r\n\0]/.test(b.senha)) throw fail('Senha: de 4 a 64 caracteres.');
     await sys('chpasswd', [], `${u}:${b.senha}\n`);
+    guardaSenha(u, b.senha);
   }
   if ('expira' in b) await setExpiry(u, chkDate(b.expira));
   if ('limite' in b) { const m = readLimits(); m.set(u, chkLimit(b.limite)); writeLimits(m); }
@@ -513,6 +515,7 @@ app.delete('/api/users/:name', auth, csrf, run(async req => {
   const u = req.params.name; mustOwn(req, u);
   await sys('pkill', ['-KILL', '-u', u]).catch(() => { });
   await sys('userdel', [u]);
+  apagaSenha(u);
   const m = readLimits(); if (m.delete(u)) writeLimits(m);
   if (u in S.map) { delete S.map[u]; }
   if (S.meta && S.meta[u]) delete S.meta[u];
@@ -831,6 +834,7 @@ async function limpaTestes() {
     await sys('pkill', ['-KILL', '-u', t.u]).catch(() => { });
     await sys('userdel', [t.u]).catch(() => { });
     if (fs.readFileSync('/etc/passwd', 'utf8').split('\n').some(l => l.split(':')[0] === t.u)) continue;
+    apagaSenha(t.u);
     const m = readLimits(); if (m.delete(t.u)) writeLimits(m);
     S.tst = S.tst.filter(x => x.u !== t.u);
     dcDeleteUser(t.u).catch(() => { });
@@ -880,6 +884,7 @@ if (T.on) {
     try {
       await sys('useradd', ['-M', '-s', '/bin/false', '-e', dia, usuario]);
       try { await sys('chpasswd', [], `${usuario}:${senha}\n`); } catch (e) { await sys('userdel', [usuario]).catch(() => { }); throw e; }
+      guardaSenha(usuario, senha);
     } catch (e) { delete S.ips[ip]; S.tlog.pop(); throw e; }
     const m = readLimits(); m.set(usuario, T.limite); writeLimits(m);
     S.tst.push({ u: usuario, ate }); save();
@@ -892,6 +897,15 @@ if (T.on) {
 
 // ===== Vendas online (Mercado Pago · Checkout Pro + webhook) =====
 // .env: MP_ACCESS_TOKEN, PUBLIC_URL, PLANOS="Mensal:30:29.90:1;Trimestral*:90:79.90:1"  (opcional: MP_WEBHOOK_SECRET)
+// Senhas em texto, no mesmo formato do SSHPlus (/etc/SSHPlus/senha/USUARIO), para a área do cliente poder mostrar a senha
+const SENHA_DIR = process.env.SENHA_DIR || '/etc/SSHPlus/senha';
+const okNome = u => typeof u === 'string' && /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,31}$/.test(u);
+function lerSenha(u) { if (!okNome(u)) return null; try { return fs.readFileSync(path.join(SENHA_DIR, u), 'utf8').replace(/\r?\n$/, '') || null; } catch { return null; } }
+function guardaSenha(u, senha) {
+  if (!okNome(u) || !senha || lerSenha(u) === senha) return;
+  try { fs.mkdirSync(SENHA_DIR, { recursive: true, mode: 0o700 }); fs.writeFileSync(path.join(SENHA_DIR, u), senha + '\n', { mode: 0o600 }); } catch (e) { console.warn('[senha] ' + e.message); }
+}
+function apagaSenha(u) { if (okNome(u)) try { fs.rmSync(path.join(SENHA_DIR, u), { force: true }); } catch { } }
 // Formulário de cartão do Mercado Pago (Card Payment Brick): só libera os domínios dele quando MP_PUBLIC_KEY existe
 function mpCsp(tipo) {
   if (!SALE.pub) return '';
@@ -954,6 +968,7 @@ async function entregaPedido(o, pay) {
   const dia = new Date(Date.now() + o.plano.dias * DIA).toISOString().slice(0, 10);
   await sys('useradd', ['-M', '-s', '/bin/false', '-e', dia, usuario]);
   try { await sys('chpasswd', [], `${usuario}:${senha}\n`); } catch (e) { await sys('userdel', [usuario]).catch(() => { }); throw e; }
+  guardaSenha(usuario, senha);
   const m = readLimits(); m.set(usuario, o.plano.limite); writeLimits(m);
   Object.assign(o, { status: 'pago', pagoEm: Date.now(), pagamento: String(pay.id), usuario, senha, expira: dia });
   save();
@@ -1205,11 +1220,13 @@ if (CLI.on) {
       f.n++; f.t = Date.now(); CLI.falhas.set(u, f); if (CLI.falhas.size > 5000) CLI.falhas.clear();
       throw fail('Usuário ou senha incorretos.');
     }
-    CLI.falhas.delete(u);
+    CLI.falhas.delete(u); guardaSenha(u, p);
     const token = crypto.randomBytes(24).toString('hex'); CLI.sess.set(token, { u, exp: Date.now() + 2 * 3600e3 });
     return { token };
   }));
   app.post('/api/cliente/logout', (req, res) => { CLI.sess.delete(String(req.get('x-cliente') || '')); res.json({ ok: true }); });
+
+  app.get('/api/cliente/senha', lim(30), cli, run(async req => ({ senha: lerSenha(req.cu) })));
 
   app.get('/api/cliente/me', lim(60), cli, run(async req => {
     const u = req.cu, su = sysUsers().find(x => x.usuario === u);
