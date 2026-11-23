@@ -845,7 +845,7 @@ if (T.on) {
 
   app.use('/teste', (req, res, next) => {
     res.setHeader('Content-Security-Policy',
-      "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'");
+      "default-src 'self'; script-src 'self' https://challenges.cloudflare.com" + mpCsp('script') + "; frame-src https://challenges.cloudflare.com" + mpCsp('frame') + "; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com" + mpCsp('style') + "; font-src https://fonts.gstatic.com" + mpCsp('font') + "; img-src 'self' data:" + mpCsp('img') + "; connect-src 'self'" + mpCsp('connect'));
     next();
   });
   app.use('/teste', express.static(path.join(__dirname, 'public-teste'), { setHeaders: r => r.setHeader('Cache-Control', 'no-cache') }));
@@ -856,7 +856,8 @@ if (T.on) {
   app.get('/api/config', (req, res) => res.json({
     horas: T.horas, whatsapp: T.wa, msg: T.msg, host: T.host, porta: T.sshPort, sitekey: T.tsKey || null,
     appUrl: T.appUrl || null, appLabel: T.appLabel || 'Baixar aplicativo',
-    planos: SALE.on ? SALE.planos.map(({ id, nome, dias, preco, limite, destaque }) => ({ id, nome, dias, preco, limite, destaque })) : []
+    planos: SALE.on ? SALE.planos.map(({ id, nome, dias, preco, limite, destaque }) => ({ id, nome, dias, preco, limite, destaque })) : [],
+    cartao: SALE.on && SALE.pub ? true : false
   }));
   app.post('/api/teste', rateLimit({
     windowMs: 60e3, max: 5, standardHeaders: true, legacyHeaders: false,
@@ -891,8 +892,14 @@ if (T.on) {
 
 // ===== Vendas online (Mercado Pago · Checkout Pro + webhook) =====
 // .env: MP_ACCESS_TOKEN, PUBLIC_URL, PLANOS="Mensal:30:29.90:1;Trimestral*:90:79.90:1"  (opcional: MP_WEBHOOK_SECRET)
+// Formulário de cartão do Mercado Pago (Card Payment Brick): só libera os domínios dele quando MP_PUBLIC_KEY existe
+function mpCsp(tipo) {
+  if (!SALE.pub) return '';
+  const mp = ' https://*.mercadopago.com https://*.mercadolibre.com https://*.mlstatic.com';
+  return ({ script: ' https://sdk.mercadopago.com' + mp, frame: mp, connect: mp, img: mp, style: ' https://*.mlstatic.com', font: ' https://*.mlstatic.com' })[tipo] || '';
+}
 const SALE = {
-  token: process.env.MP_ACCESS_TOKEN || '', secret: process.env.MP_WEBHOOK_SECRET || '',
+  token: process.env.MP_ACCESS_TOKEN || '', pub: (process.env.MP_PUBLIC_KEY || '').trim(), parcelas: Math.min(12, Math.max(1, parseInt(process.env.MP_PARCELAS, 10) || 1)), secret: process.env.MP_WEBHOOK_SECRET || '',
   url: (process.env.PUBLIC_URL || '').replace(/\/+$/, ''),
   api: (process.env.MP_API_BASE || 'https://api.mercadopago.com').replace(/\/+$/, ''),
   planos: (process.env.PLANOS || '').split(';').map(s => s.trim()).filter(Boolean).map((s, i) => {
@@ -1013,6 +1020,12 @@ async function criaPedido(body, extra = {}) {
       save();
       return { id, pix: { codigo: td.qr_code, qr: td.qr_code_base64 || '', ate } };
     }
+    if (String(body.metodo) === 'cartao' && SALE.pub) {
+      // Cartão direto na página: o formulário (Card Payment Brick) é do Mercado Pago; aqui só criamos o pedido
+      S.pedidos.push({ id, plano: { nome: plano.nome, dias: plano.dias, preco: plano.preco, limite: plano.limite }, status: 'pendente', criado: Date.now(), ...extra, metodo: 'cartao', tent: 0 });
+      save();
+      return { id, cartao: { key: SALE.pub, valor: plano.preco, parcelas: SALE.parcelas } };
+    }
     const r = await mp('POST', '/checkout/preferences', {
       items: [{ id: plano.id, title: ((extra.renovacao ? 'Renovação ' : 'Acesso ') + plano.nome + ' · ' + plano.dias + ' dias').slice(0, 250), quantity: 1, unit_price: plano.preco, currency_id: 'BRL' }],
       external_reference: id, notification_url: SALE.url + '/api/mp/webhook',
@@ -1038,9 +1051,51 @@ if (SALE.on) {
     if (!o) throw fail('Pedido não encontrado.');
     if (o.status === 'pendente' && Date.now() - (o.ck || 0) > 8000) { o.ck = Date.now(); await reconcilia(o).catch(e => console.warn('[MP] consulta:', e.message)); }
     const out = { status: o.status, plano: o.plano.nome, dias: o.plano.dias };
-    if (o.status === 'pendente') { if (o.pix) { out.pix = o.pix; out.expirado = Date.now() > o.pix.ate + 60e3; } else out.url = o.url; }
+    if (o.status === 'pendente') { if (o.pix) { out.pix = o.pix; out.expirado = Date.now() > o.pix.ate + 60e3; } else if (o.metodo === 'cartao') { out.cartao = { key: SALE.pub, valor: o.plano.preco, parcelas: SALE.parcelas }; out.analise = !!o.cartaoId; } else out.url = o.url; }
     if (o.status === 'pago') { if (o.renovacao) out.renovacao = true; out.usuario = o.usuario; out.expira = o.expira; out.limite = o.plano.limite; if (o.senha) out.senha = o.senha; Object.assign(out, xrayInfo(o.usuario)); }
     return out;
+  }));
+
+
+  // Cobra o cartão com o token gerado pelo formulário do Mercado Pago (o valor vem SEMPRE do pedido, nunca do navegador)
+  const CARTAO_MSG = {
+    cc_rejected_insufficient_amount: 'Saldo ou limite insuficiente. Tente outro cartão.', cc_rejected_bad_filled_security_code: 'Código de segurança incorreto.',
+    cc_rejected_bad_filled_date: 'Data de validade incorreta.', cc_rejected_bad_filled_other: 'Confira os dados do cartão.', cc_rejected_bad_filled_card_number: 'Número do cartão incorreto.',
+    cc_rejected_call_for_authorize: 'Seu banco pediu autorização. Ligue para o banco ou use outro cartão.', cc_rejected_card_disabled: 'Cartão desativado. Ative com seu banco ou use outro.',
+    cc_rejected_high_risk: 'Pagamento recusado por segurança. Tente o Pix ou outro cartão.', cc_rejected_duplicated_payment: 'Você já fez esse pagamento há pouco. Aguarde alguns segundos.',
+    cc_rejected_max_attempts: 'Muitas tentativas com esse cartão. Use outro ou o Pix.'
+  };
+  app.post('/api/pedidos/:id/cartao', rateLimit({
+    windowMs: 60e3, max: 8, standardHeaders: true, legacyHeaders: false, message: { error: 'Muitas tentativas. Aguarde um minuto.' }
+  }), run(async req => {
+    const id = String(req.params.id || ''), o = /^[0-9a-f]{24}$/.test(id) && S.pedidos.find(x => x.id === id), b = req.body || {}, py = b.payer || {};
+    if (!o || o.metodo !== 'cartao') throw fail('Pedido não encontrado.');
+    if (o.status !== 'pendente') return { status: o.status === 'pago' ? 'pago' : 'encerrado' };
+    if (o.cobrando) throw fail('Pagamento em andamento. Aguarde um instante.');
+    if (o.cartaoId) return { status: 'analise' };
+    if ((o.tent || 0) >= 5) throw fail('Muitas tentativas neste pedido. Volte e escolha o plano de novo.');
+    const tok = String(b.token || ''), met = String(b.payment_method_id || ''), email = String(py.email || '').trim().toLowerCase();
+    const idt = py.identification && typeof py.identification === 'object' ? py.identification : null;
+    if (!/^[A-Za-z0-9_-]{8,128}$/.test(tok) || !/^[a-z0-9_]{2,30}$/.test(met) || !/^[^@\s]{1,64}@[^@\s]{1,120}\.[^@\s]{2,}$/.test(email)) throw fail('Confira os dados do cartão e tente de novo.');
+    const parc = Math.min(SALE.parcelas, Math.max(1, parseInt(b.installments, 10) || 1));
+    const pay0 = {
+      transaction_amount: o.plano.preco, token: tok, installments: parc, payment_method_id: met,
+      description: ((o.renovacao ? 'Renovação ' : 'Acesso ') + o.plano.nome + ' · ' + o.plano.dias + ' dias').slice(0, 250),
+      payer: { email }, external_reference: o.id, notification_url: SALE.url + '/api/mp/webhook'
+    };
+    if (/^\d{1,20}$/.test(String(b.issuer_id || ''))) pay0.issuer_id = String(b.issuer_id);
+    if (idt && /^[A-Za-z]{2,10}$/.test(String(idt.type || '')) && /^[0-9.\-\/ ]{5,25}$/.test(String(idt.number || ''))) pay0.payer.identification = { type: String(idt.type), number: String(idt.number).replace(/\D/g, '') };
+    o.cobrando = true; o.tent = (o.tent || 0) + 1;
+    try {
+      const pay = await mp('POST', '/v1/payments', pay0, { 'X-Idempotency-Key': o.id + '-' + o.tent });
+      if (pay.status === 'approved') { await aplicaPagamento(pay); if (o.status !== 'pago') { o.cartaoId = String(pay.id); save(); } return { status: o.status === 'pago' ? 'pago' : 'analise' }; }
+      if (pay.status === 'in_process' || pay.status === 'pending') { o.cartaoId = String(pay.id); save(); return { status: 'analise' }; }
+      save();
+      return { status: 'recusado', msg: CARTAO_MSG[pay.status_detail] || 'O cartão foi recusado. Confira os dados, tente outro cartão ou pague com Pix.' };
+    } catch (e) {
+      console.warn('[MP] cartão (pedido ' + o.id + '): ' + e.message);
+      throw fail('Não foi possível processar o cartão agora. Confira os dados e tente de novo ou pague com Pix.');
+    } finally { o.cobrando = false; }
   }));
 
   app.post('/api/mp/webhook', rateLimit({ windowMs: 60e3, max: 120, standardHeaders: false, legacyHeaders: false }), async (req, res) => {
@@ -1117,7 +1172,7 @@ if (PUSH.on) { setTimeout(() => avisaVencimentos().catch(e => console.error('avi
 const CLI = { on: process.env.CLIENTE_AREA !== '0', sess: new Map(), falhas: new Map() };
 if (CLI.on) {
   app.use('/cliente', (req, res, next) => {
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'" + mpCsp('script') + (SALE.pub ? '; frame-src' + mpCsp('frame') : '') + "; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com" + mpCsp('style') + "; font-src https://fonts.gstatic.com" + mpCsp('font') + "; img-src 'self' data:" + mpCsp('img') + "; connect-src 'self'" + mpCsp('connect'));
     next();
   });
   app.use('/cliente', express.static(path.join(__dirname, 'public-cliente'), { setHeaders: r => r.setHeader('Cache-Control', 'no-cache') }));
@@ -1138,7 +1193,7 @@ if (CLI.on) {
   };
   const lim = (max, ms = 60e3, msg = 'Muitas tentativas. Aguarde um instante.') => rateLimit({ windowMs: ms, max, standardHeaders: true, legacyHeaders: false, message: { error: msg } });
 
-  app.get('/api/cliente/config', (req, res) => res.json({ whatsapp: T.wa, msg: T.msg, appUrl: T.appUrl || null, appLabel: T.appLabel || 'Baixar aplicativo', teste: T.on }));
+  app.get('/api/cliente/config', (req, res) => res.json({ whatsapp: T.wa, msg: T.msg, appUrl: T.appUrl || null, appLabel: T.appLabel || 'Baixar aplicativo', teste: T.on, cartao: SALE.on && SALE.pub ? true : false }));
 
   app.post('/api/cliente/login', lim(12, 10 * 60e3, 'Muitas tentativas. Aguarde alguns minutos.'), run(async req => {
     const u = String((req.body || {}).usuario || '').trim().slice(0, 40), p = String((req.body || {}).senha || '');
