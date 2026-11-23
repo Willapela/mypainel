@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/teste/teste.css?v=v10">
+<link rel="stylesheet" href="/teste/teste.css?v=v11">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -75,6 +75,14 @@
         </ol>
         <button type="button" id="pixNew" class="btn ghost" hidden>Gerar novo Pix</button>
       </div>
+      <div id="payCard" hidden>
+        <h2>Pague com cartão</h2>
+        <p class="muted" id="cardInfo"></p>
+        <div id="cardBrick" class="brick"></div>
+        <p id="cardErr" class="err" role="alert"></p>
+        <p class="secure"><svg aria-hidden="true"><use href="#i-lock"/></svg> Os dados do cartão são enviados direto ao Mercado Pago</p>
+        <button type="button" id="cardBack" class="btn ghost">Escolher outro plano</button>
+      </div>
       <div id="payOk" hidden>
         <div class="badge-ok"><svg aria-hidden="true"><use href="#i-check"/></svg></div>
         <h2>Pagamento aprovado!</h2>
@@ -135,7 +143,7 @@
     <div class="c">
       <div class="trust">
         <div><svg aria-hidden="true"><use href="#i-bolt"/></svg><p><b>Liberação automática</b><span>Pagou, o acesso é criado.</span></p></div>
-        <div><svg aria-hidden="true"><use href="#i-card"/></svg><p><b>Pix, cartão e boleto</b><span>Tudo pelo Mercado Pago.</span></p></div>
+        <div><svg aria-hidden="true"><use href="#i-card"/></svg><p><b>Pix e cartão</b><span>Pague sem sair da página.</span></p></div>
         <div><svg aria-hidden="true"><use href="#i-gift"/></svg><p><b>Teste sem cadastro</b><span>Sem cartão e sem pegadinha.</span></p></div>
         <div><svg aria-hidden="true"><use href="#i-shield"/></svg><p><b>Pagamento protegido</b><span>Seus dados não passam por aqui.</span></p></div>
       </div>
@@ -173,7 +181,7 @@
           <p>Assim que o Mercado Pago confirma, o acesso é criado e aparece na mesma página. Sem fila e sem esperar atendimento.</p>
           <div class="flow"><span><svg><use href="#i-card"/></svg>Pagamento</span><i></i><span><svg><use href="#i-check"/></svg>Confirmado</span><i></i><span><svg><use href="#i-wave"/></svg>Acesso criado</span></div>
         </article>
-        <article class="feat"><span class="ico"><svg><use href="#i-card"/></svg></span><h3>Pix e cartão</h3><p>Pague como preferir.</p><div class="tags"><span>Pix</span><span>Crédito</span><span>Débito</span><span>Boleto</span></div></article>
+        <article class="feat"><span class="ico"><svg><use href="#i-card"/></svg></span><h3>Pix e cartão</h3><p>Pague como preferir.</p><div class="tags"><span>Pix</span><span>Crédito</span><span>Débito</span></div></article>
         <article class="feat"><span class="ico"><svg><use href="#i-gift"/></svg></span><h3>Teste sem compromisso</h3><p>Experimente antes de assinar. Sem cartão, sem cadastro e sem pegadinha.</p></article>
         <article class="feat dev3"><span class="ico"><svg><use href="#i-users"/></svg></span><h3>Conexões por plano</h3><p>Cada plano mostra quantos aparelhos usam o acesso ao mesmo tempo.</p><div class="devs"><svg><use href="#i-phone"/></svg><svg><use href="#i-tablet"/></svg><svg><use href="#i-laptop"/></svg></div></article>
         <article class="feat"><span class="ico"><svg><use href="#i-shield"/></svg></span><h3>Pagamento protegido</h3><p>O pagamento acontece no Mercado Pago. Você não digita dados de cartão aqui.</p></article>
@@ -225,7 +233,7 @@
       <div class="faq">
         <details><summary>O teste é realmente grátis? <svg aria-hidden="true"><use href="#i-chev"/></svg></summary><p>Sim. Você gera o teste sem cartão e sem cadastro. Cada rede pode gerar um teste por dia.</p></details>
         <details><summary>Quanto tempo leva para liberar depois de pagar? <svg aria-hidden="true"><use href="#i-chev"/></svg></summary><p>Em geral, poucos segundos. Quando o pagamento é confirmado, seu usuário e senha aparecem nesta mesma página. Se você fechar a aba, é só reabrir esta página no mesmo aparelho.</p></details>
-        <details><summary>Quais formas de pagamento posso usar? <svg aria-hidden="true"><use href="#i-chev"/></svg></summary><p>Pix (com QR Code ou código copia e cola), cartão de crédito ou débito e boleto, tudo pelo Mercado Pago.</p></details>
+        <details><summary>Quais formas de pagamento posso usar? <svg aria-hidden="true"><use href="#i-chev"/></svg></summary><p>Pix (com QR Code ou código copia e cola), cartão de crédito ou débito, tudo processado pelo Mercado Pago, sem sair desta página.</p></details>
         <details><summary>Posso usar em mais de um aparelho? <svg aria-hidden="true"><use href="#i-chev"/></svg></summary><p>Depende do plano: cada um indica quantas conexões simultâneas estão incluídas.</p></details>
         <details><summary>Meus dados de pagamento ficam seguros? <svg aria-hidden="true"><use href="#i-chev"/></svg></summary><p>Sim. O pagamento é feito no ambiente do Mercado Pago. Este site nunca recebe nem guarda dados do seu cartão.</p></details>
         <details><summary>Como renovo meu acesso? <svg aria-hidden="true"><use href="#i-chev"/></svg></summary><p>Entre na <a href="/cliente/">Área do cliente</a> com seu usuário e senha, veja a validade e renove com Pix ou cartão. Os dias do plano são somados ao que você ainda tem.</p></details>
@@ -254,6 +262,6 @@
     <small>Pagamentos processados pelo Mercado Pago</small>
   </div>
 </footer>
-<script src="/teste/teste.js?v=v10"></script>
+<script src="/teste/teste.js?v=v11"></script>
 </body>
 </html>

@@ -84,8 +84,8 @@ function renderPlans() {
     const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn ' + (p.destaque ? 'primary' : ''); btn.textContent = 'Pagar com Pix';
     btn.onclick = () => comprar(p, btn, 'pix');
     const alt = document.createElement('button'); alt.type = 'button'; alt.className = 'btn card-btn'; alt.textContent = 'Pagar com cartão';
-    alt.onclick = () => comprar(p, alt, 'mp');
-    const hint = document.createElement('p'); hint.className = 'meios'; hint.textContent = 'Cartão de crédito, débito ou boleto';
+    alt.onclick = () => comprar(p, alt, cfg.cartao ? 'cartao' : 'mp');
+    const hint = document.createElement('p'); hint.className = 'meios'; hint.textContent = cfg.cartao ? 'Crédito ou débito, sem sair desta página' : 'Cartão de crédito, débito ou boleto';
     return ticket(c, h, pr, per, ul, [btn, alt], hint);
   }));
 }
@@ -96,9 +96,10 @@ async function comprar(p, btn, metodo) {
   try {
     const r = await fetch('/api/pedidos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plano: p.id, metodo }) });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok || !(d.url || d.pix)) throw new Error(d.error || 'Não foi possível abrir o pagamento agora. Tente de novo.');
+    if (!r.ok || !(d.url || d.pix || d.cartao)) throw new Error(d.error || 'Não foi possível abrir o pagamento agora. Tente de novo.');
     store.set(d.id);
     if (d.pix) { renderPix(d.pix, 'Plano ' + p.nome + ' · ' + brl(p.preco)); acompanha(d.id); all.forEach(x => x.disabled = false); btn.textContent = old; return; }
+    if (d.cartao) { renderCartao(d.cartao, d.id, 'Plano ' + p.nome + ' · ' + brl(p.preco)); all.forEach(x => x.disabled = false); btn.textContent = old; return; }
     location.href = d.url;
   } catch (e) { $('#planErr').textContent = e.message; all.forEach(x => x.disabled = false); btn.textContent = old; }
 }
@@ -106,8 +107,8 @@ async function comprar(p, btn, metodo) {
 /* ---------- acompanhamento do pagamento ---------- */
 function showPay(state) {
   $('#pay').hidden = false;
-  ['Wait', 'Pix', 'Ok', 'Bad'].forEach(k => { $('#pay' + k).hidden = k !== state; });
-  const focus = state === 'Wait' || state === 'Pix' || state === 'Ok';
+  ['Wait', 'Pix', 'Card', 'Ok', 'Bad'].forEach(k => { $('#pay' + k).hidden = k !== state; });
+  const focus = state === 'Wait' || state === 'Pix' || state === 'Card' || state === 'Ok';
   const was = $('#landing').hidden; $('#landing').hidden = focus; if (focus && !was) window.scrollTo({ top: 0 });
 }
 let pixTimer = null, pixCode = '';
@@ -146,6 +147,7 @@ async function checa(id, first) {
     if (d.status === 'estornado') return badView('Pagamento estornado', 'Esse pagamento foi devolvido. Para voltar a usar, faça uma nova assinatura ou chame no WhatsApp.');
     if (d.status === 'divergente') return badView('Valor do pagamento diferente', 'O valor pago não confere com o plano. Chame no WhatsApp para resolvermos rápido.');
     if (d.pix) { if (pixCode !== d.pix.codigo) renderPix(d.pix, 'Plano ' + d.plano); return; }
+    if (d.cartao && !d.analise) { if ($('#payCard').hidden) renderCartao(d.cartao, id, 'Plano ' + d.plano); return; }
     showPay('Wait');
     if (d.url) { $('#payRetry').href = d.url; }
   } catch { /* tenta de novo no próximo ciclo */ }
@@ -158,10 +160,46 @@ function acompanha(id) {
   poll = setInterval(() => { n++; if (Date.now() - t0 > 30 * 60e3) { clearInterval(poll); return; } checa(id, false); }, 3000);
 }
 
+/* ---------- cartão direto na página (formulário do Mercado Pago) ---------- */
+let brick = null;
+function loadMp() {
+  return new Promise((ok, no) => {
+    if (window.MercadoPago) return ok();
+    const s = document.createElement('script'); s.src = 'https://sdk.mercadopago.com/js/v2'; s.onload = ok;
+    s.onerror = () => no(new Error('Não foi possível carregar o formulário de cartão. Verifique sua conexão ou pague com Pix.')); document.head.append(s);
+  });
+}
+async function renderCartao(c, id, label) {
+  clearInterval(pixTimer); showPay('Card'); window.scrollTo({ top: 0, behavior: 'smooth' });
+  $('#cardInfo').textContent = label + ' — preencha os dados do cartão abaixo. O pagamento é processado pelo Mercado Pago.'; $('#cardErr').textContent = '';
+  try { await loadMp(); } catch (e) { $('#cardErr').textContent = e.message; return; }
+  try { if (brick) await brick.unmount(); } catch { } brick = null; $('#cardBrick').replaceChildren();
+  try {
+    const mpx = new window.MercadoPago(c.key, { locale: 'pt-BR' });
+    brick = await mpx.bricks().create('cardPayment', 'cardBrick', {
+      initialization: { amount: c.valor },
+      customization: { visual: { style: { theme: 'dark' } }, paymentMethods: { minInstallments: 1, maxInstallments: c.parcelas || 1 } },
+      callbacks: {
+        onReady: () => { },
+        onSubmit: async data => {
+          $('#cardErr').textContent = '';
+          let r, d; try { r = await fetch('/api/pedidos/' + encodeURIComponent(id) + '/cartao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); d = await r.json().catch(() => ({})); } catch { r = { ok: false }; d = {}; }
+          if (!r.ok) { $('#cardErr').textContent = d.error || 'Sem conexão. Tente de novo.'; throw new Error('falhou'); }
+          if (d.status === 'recusado') { $('#cardErr').textContent = d.msg; throw new Error('recusado'); }
+          acompanha(id);
+        },
+        onError: e => { console.warn('cartão:', e && (e.message || e.type)); }
+      }
+    });
+  } catch (e) { $('#cardErr').textContent = 'Não foi possível abrir o formulário de cartão. Tente de novo ou pague com Pix.'; }
+}
+
+$('#cardBack').onclick = () => { store.set(''); clearInterval(poll); try { if (brick) brick.unmount(); } catch { } brick = null; $('#pay').hidden = true; $('#landing').hidden = false; renderPlans(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+
 async function recupera(id) {
   try {
     const r = await fetch('/api/pedidos/' + encodeURIComponent(id)), d = await r.json().catch(() => ({}));
-    if (r.ok && d.status === 'pago' && d.senha) paidView(d); else if (r.ok && d.status === 'pendente' && d.pix && !d.expirado) acompanha(id); else store.set('');
+    if (r.ok && d.status === 'pago' && d.senha) paidView(d); else if (r.ok && d.status === 'pendente' && ((d.pix && !d.expirado) || d.cartao)) acompanha(id); else store.set('');
   } catch { }
 }
 
