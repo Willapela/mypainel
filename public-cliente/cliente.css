@@ -256,6 +256,27 @@ dl .row button:hover{background:var(--cobalt);border-color:var(--cobalt);color:#
 .notif .btn{flex:none}
 @media (max-width:620px){.notif{flex-wrap:wrap;padding:20px 18px}.n-tx{flex:1 1 calc(100% - 74px)}.notif .btn{width:100%}}
 
+/* cartão de acesso (dados de conexão) */
+.conn-h{display:flex;gap:16px;align-items:center;margin-bottom:22px}
+.conn-ic{flex:none;width:52px;height:52px;border-radius:16px;background:var(--grad,var(--cobalt));color:#fff;display:grid;place-items:center;box-shadow:0 14px 24px -14px #a855f7}
+.conn-ic svg{width:26px;height:26px}
+.conn-h h2{margin:0}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tile{position:relative;display:grid;grid-template-columns:1fr auto;grid-template-areas:"l a" "v a";gap:3px 12px;align-items:center;background:var(--sky);border:1px solid var(--line);border-radius:18px;padding:14px 12px 14px 18px;min-width:0;transition:border-color .2s,background .2s}
+.tile.wide{grid-column:1/-1}
+.t-l{grid-area:l;font-size:13px;font-weight:700;color:var(--mut)}
+.t-v{grid-area:v;font:600 17px/1.35 var(--f-mono);word-break:break-all;min-width:0;color:var(--ink)}
+.tile.secret .t-v{letter-spacing:.12em}
+.t-v.hint{font:500 14px var(--f-body);letter-spacing:0;color:var(--amber)}
+.t-a{grid-area:a;display:flex;gap:6px}
+.t-btn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line2);background:rgba(255,255,255,.04);color:var(--ink2);display:grid;place-items:center;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.t-btn:hover{background:var(--vio,var(--cobalt));border-color:var(--vio,var(--cobalt));color:#fff}
+.t-btn svg{width:19px;height:19px}
+.tile.ok{border-color:var(--mint);background:var(--mintbg)}
+.tile.ok::after{content:"Copiado";position:absolute;right:62px;top:12px;font-size:12.5px;font-weight:700;color:var(--mint)}
+.conn-main .btns{margin-top:20px}
+@media (max-width:620px){.tiles{grid-template-columns:1fr}.conn-h{gap:12px}.conn-ic{width:46px;height:46px}.t-v{font-size:16px}}
+
 /* ======== Tema violeta escuro (cores clássicas do painel) ======== */
 :root{
   --ink:#f4f1ff;--ink2:#cbc3e8;--mut:#9a91b8;--bg:#07050f;--card:#110c22;--sky:rgba(139,92,246,.13);--sky2:rgba(139,92,246,.28);

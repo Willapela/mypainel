@@ -11,6 +11,32 @@ const wa = extra => cfg.whatsapp ? 'https://wa.me/' + cfg.whatsapp + '?text=' + 
 const OK_ID = v => /^[0-9a-f]{24}$/.test(v);
 
 function icon(name) { const s = document.createElementNS(NS, 'svg'), u = document.createElementNS(NS, 'use'); u.setAttribute('href', '#i-' + name); s.append(u); return s; }
+function tile(label, value, o = {}) {
+  const t = document.createElement('div'); t.className = 'tile' + (o.wide ? ' wide' : '') + (o.secret ? ' secret' : '');
+  const l = document.createElement('span'); l.className = 't-l'; l.textContent = label;
+  const v = document.createElement('b'); v.className = 't-v'; const MASK = '••••••••'; v.textContent = o.secret ? MASK : value;
+  const act = document.createElement('div'); act.className = 't-a';
+  const mk = (txt, icon, aria) => { const b = document.createElement('button'); b.type = 'button'; b.className = 't-btn'; b.setAttribute('aria-label', aria); b.title = aria; b.innerHTML = '<svg aria-hidden="true"><use href="#i-' + icon + '"/></svg>'; return b; };
+  let shown = false;
+  if (o.secret) {
+    const eye = mk('', 'eye', 'Mostrar senha');
+    eye.onclick = async () => {
+      if (shown) { shown = false; v.textContent = MASK; eye.firstChild.firstChild.setAttribute('href', '#i-eye'); return; }
+      let s = ''; try { s = await o.secret(); } catch { }
+      if (!s) { v.textContent = 'Use a senha que você digitou ao entrar'; v.classList.add('hint'); return; }
+      v.classList.remove('hint'); v.textContent = s; shown = true; eye.firstChild.firstChild.setAttribute('href', '#i-eyeoff');
+    };
+    act.append(eye);
+  }
+  const cp = mk('', 'copy', 'Copiar ' + label.toLowerCase());
+  cp.onclick = async () => {
+    let txt = value; if (o.secret) { try { txt = await o.secret(); } catch { txt = ''; } }
+    if (!txt) { v.textContent = 'Use a senha que você digitou ao entrar'; v.classList.add('hint'); return; }
+    try { await navigator.clipboard.writeText(txt); t.classList.add('ok'); setTimeout(() => t.classList.remove('ok'), 1400); } catch { }
+  };
+  act.append(cp); t.append(l, v, act); return t;
+}
+
 function row(label, value) {
   const d = document.createElement('div'); d.className = 'row';
   const dt = document.createElement('dt'); dt.textContent = label;
@@ -85,10 +111,17 @@ function renderConta() {
   else if (m.teste) { warn.textContent = 'Esta é uma conta de teste e será apagada quando o tempo acabar. Assine um plano para continuar com o mesmo usuário e senha.'; warn.hidden = false; }
   else warn.hidden = true;
 
-  const box = $('#aDados'); box.replaceChildren(row('Usuário', m.usuario));
-  if (m.host) box.append(row('Servidor', m.host), row('Porta', m.porta));
-  if (m.uuid) box.append(row('UUID', m.uuid));
-  if (m.link) box.append(row('Link', m.link));
+  const box = $('#aDados'); box.replaceChildren();
+  let senhaCache = null; const senha = async () => { if (senhaCache === null) { const { d } = await api('/api/cliente/senha'); senhaCache = d.senha || ''; } return senhaCache; };
+  box.append(tile('Usuário', m.usuario), tile('Senha', '', { secret: senha }));
+  if (m.host) box.append(tile('Servidor', m.host), tile('Porta', String(m.porta)));
+  if (m.uuid) box.append(tile('UUID', m.uuid, { wide: true }));
+  if (m.link) box.append(tile('Link', m.link, { wide: true }));
+  $('#aCopyAll').onclick = async e => {
+    const b = e.currentTarget, linhas = ['Usuário: ' + m.usuario, 'Senha: ' + (await senha().catch(() => '') || '(use a senha que você digitou ao entrar)')];
+    if (m.host) linhas.push('Servidor: ' + m.host, 'Porta: ' + m.porta); if (m.uuid) linhas.push('UUID: ' + m.uuid);
+    const old = b.textContent; try { await navigator.clipboard.writeText(linhas.join('\n')); b.textContent = 'Tudo copiado!'; } catch { b.textContent = 'Não foi possível copiar'; } setTimeout(() => b.textContent = old, 1800);
+  };
   $('#aUuid').hidden = !(m.xray && !m.uuid && m.status === 'ativo');
   const app = $('#aApp'); if (cfg.appUrl) { app.href = cfg.appUrl; app.textContent = cfg.appLabel || 'Baixar aplicativo'; app.hidden = false; } else app.hidden = true;
 
