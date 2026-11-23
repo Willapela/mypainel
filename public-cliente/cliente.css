@@ -379,3 +379,27 @@ dl .row button:hover{background:var(--vio);border-color:var(--vio);color:#fff}
 .feat[data-needs="wa"]{grid-column:1/-1;flex-direction:row;align-items:center;gap:20px;padding:22px 28px}
 .feat[data-needs="wa"] .ico{margin:0;flex:none}.feat[data-needs="wa"] h3{margin-bottom:2px}
 @media (max-width:620px){.feat[data-needs="wa"]{flex-direction:column;align-items:flex-start}}
+
+/* ======== ícones duotone em blocos coloridos ======== */
+:root{
+  --g1:linear-gradient(135deg,#7c3aed,#d946ef);--g2:linear-gradient(135deg,#4f46e5,#38bdf8);
+  --g3:linear-gradient(135deg,#059669,#2dd4bf);--g4:linear-gradient(135deg,#f97316,#ec4899);
+  --gs:0 12px 22px -12px rgba(168,85,247,.9),inset 0 1px 0 rgba(255,255,255,.25)
+}
+svg{stroke-width:2}
+.trust svg,.feat .ico,.stat svg,.auth-art li svg,.conn-ic,.login .av-i,.n-ic{background:var(--g1);color:#fff;box-shadow:var(--gs)}
+.trust svg{width:46px;height:46px;padding:11px;border-radius:14px}
+.trust div:nth-child(2) svg{background:var(--g2)}.trust div:nth-child(3) svg{background:var(--g4)}.trust div:nth-child(4) svg{background:var(--g3)}
+.feat .ico{width:54px;height:54px;border-radius:16px}.feat .ico svg{width:27px;height:27px;background:none;box-shadow:none;padding:0}
+.bento .feat:nth-child(2) .ico{background:var(--g2)}.bento .feat:nth-child(3) .ico{background:var(--g4)}.bento .feat:nth-child(4) .ico{background:var(--g1)}.bento .feat:nth-child(5) .ico{background:var(--g3)}.bento .feat:nth-child(6) .ico{background:var(--g2)}
+.feat.big .ico{background:rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+.stat svg{width:52px;height:52px;padding:13px;border-radius:16px}
+.stats .stat:nth-child(2) svg{background:var(--g2)}.stats .stat:nth-child(3) svg{background:var(--g4)}
+.auth-art li svg{width:46px;height:46px;padding:11px;border-radius:14px}
+.auth-art li:nth-child(2) svg{background:var(--g2)}.auth-art li:nth-child(3) svg{background:var(--g4)}
+.conn-ic{box-shadow:var(--gs)}.conn-ic svg{background:none;box-shadow:none}
+.n-ic{background:var(--g4);color:#fff}.n-ic svg{background:none;box-shadow:none}
+.login .av-i{width:60px;height:60px;border-radius:19px}.login .av-i svg{background:none;box-shadow:none;width:30px;height:30px;padding:0}
+.t-btn{color:#ddd6fe}
+.chips svg,.ticks svg{box-shadow:none}
+.step .art .pill svg{color:#c4b5fd}
