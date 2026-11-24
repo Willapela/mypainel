@@ -301,7 +301,12 @@ async function pushToggle() {
       const { r, d } = await api('/api/cliente/push/sub', { method: 'POST', body: JSON.stringify({ sub: nova.toJSON() }) });
       if (!r.ok) { await nova.unsubscribe(); throw new Error(d.error || 'Não foi possível ativar os avisos.'); }
     }
-  } catch (e) { alert(e.message || 'Não foi possível concluir.'); }
+  } catch (e) {
+    const m = String(e && e.message || '');
+    alert(/push service|AbortError|registration failed/i.test(m)
+      ? 'Este celular não conseguiu se conectar ao serviço de notificações do Google. Confira: 1) internet sem VPN ou DNS privado bloqueando; 2) Google Play Services atualizado; 3) Chrome sem economia de dados; 4) data e hora automáticas. Depois feche o Chrome e tente de novo. Se não funcionar neste aparelho, avise o suporte.'
+      : (m || 'Não foi possível concluir.'));
+  }
   btn.disabled = false; pushRender();
 }
 
